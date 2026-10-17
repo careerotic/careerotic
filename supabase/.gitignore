@@ -1,0 +1,11 @@
+# Supabase local state and secrets
+.branches
+.temp
+.env
+.env.*
+.env.keys
+.env.local
+.env.*.local
+
+# Keep migrations and config tracked; they are intentionally versioned.
+# The migration under supabase/migrations should remain in Git.

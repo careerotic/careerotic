@@ -30,8 +30,16 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files and local secrets (never commit credentials)
+.env
+.env.*
+!.env.example
+
+# local Supabase CLI state and linked project metadata
+/supabase/.temp/
+/supabase/.branches
+/supabase/.env
+/supabase/.env.*
 
 # vercel
 .vercel
