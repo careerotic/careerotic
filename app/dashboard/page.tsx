@@ -2,13 +2,22 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function DashboardPage() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void createClient().auth.getClaims().then(({ data }) => {
+      if (active) setIsAdmin((data?.claims as Record<string, any> | undefined)?.app_metadata?.role === "admin");
+    });
+    return () => { active = false; };
+  }, []);
 
   async function signOut() {
     setBusy(true);
@@ -32,6 +41,7 @@ export default function DashboardPage() {
           <h1 className="mt-2 text-3xl font-bold tracking-tight">Welcome to Careerotic</h1>
         </div>
         <div className="flex flex-wrap gap-2">
+          {isAdmin && <Link href="/admin" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Admin panel</Link>}
           <Link href="/account" className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50">My account</Link>
           <button onClick={signOut} disabled={busy} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-60">{busy ? "Signing out…" : "Sign out"}</button>
         </div>
