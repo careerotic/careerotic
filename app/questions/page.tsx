@@ -45,7 +45,16 @@ function optionIsCorrect(option: Option, answer: Answer | undefined) {
 }
 
 export default function QuestionsPage() {
-  const [supabase] = useState(() => createClient());
+  const [supabase, setSupabase] = useState<ReturnType<typeof createClient> | null>(null);
+
+  useEffect(() => {
+    try {
+      setSupabase(createClient());
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+      setLoading(false);
+    }
+  }, []);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [subjects, setSubjects] = useState<{ id: string; name: string }[]>([]);
   const [topics, setTopics] = useState<{ id: string; name: string; subject_id: string }[]>([]);
@@ -78,6 +87,7 @@ export default function QuestionsPage() {
   }, [searchInput]);
 
   useEffect(() => {
+    if (!supabase) return;
     let active = true;
     async function loadTaxonomy() {
       const [{ data: subjectRows, error: subjectError }, { data: topicRows, error: topicError }] = await Promise.all([
@@ -102,6 +112,7 @@ export default function QuestionsPage() {
   );
 
   const loadQuestions = useCallback(async () => {
+    if (!supabase) return;
     setLoading(true);
     setError("");
     setNotice("");
@@ -136,7 +147,7 @@ export default function QuestionsPage() {
   useEffect(() => { void loadQuestions(); }, [loadQuestions]);
 
   useEffect(() => {
-    if (questions.length === 0) return;
+    if (!supabase || questions.length === 0) return;
     let active = true;
     async function preloadAnswers() {
       const missing = questions.filter((question) => !answers[question.id]);
@@ -161,6 +172,7 @@ export default function QuestionsPage() {
   }, [questions, supabase, answers]);
 
   useEffect(() => {
+    if (!supabase) return;
     let active = true;
     async function loadBookmarks() {
       const { data: userResult } = await supabase.auth.getUser();
@@ -182,6 +194,7 @@ export default function QuestionsPage() {
   useEffect(() => { setPage(1); }, [topicId, language, sort]);
 
   async function toggleBookmark(question: Question) {
+    if (!supabase) { setNotice("Supabase is not configured for this deployment."); return; }
     setError("");
     setNotice("");
     const { data: userResult, error: authError } = await supabase.auth.getUser();
@@ -203,6 +216,7 @@ export default function QuestionsPage() {
   async function submitReport(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!reportQuestion) return;
+    if (!supabase) { setError("Supabase is not configured for this deployment."); return; }
     setReportBusy(true);
     setError("");
     setNotice("");
