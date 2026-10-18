@@ -20,116 +20,58 @@ export default function SignupPage() {
     event.preventDefault();
     setError("");
     setSuccess("");
-
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
-    if (password.length < 8) {
-      setError("Use a password with at least 8 characters.");
-      return;
-    }
+    if (password !== confirmPassword) return setError("Passwords do not match.");
+    if (password.length < 8) return setError("Use a password with at least 8 characters.");
 
     setBusy(true);
     try {
       const supabase = createClient();
+      const redirectTo = new URL("/auth/callback?next=/dashboard", window.location.origin).toString();
       const { data, error: signupError } = await supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
-          data: {
-            full_name: fullName.trim(),
-            phone_number: phoneNumber.trim(),
-            date_of_birth: dateOfBirth,
-          },
+          emailRedirectTo: redirectTo,
+          data: { full_name: fullName.trim(), phone_number: phoneNumber.trim(), date_of_birth: dateOfBirth },
         },
       });
-
       if (signupError) throw signupError;
-
       if (data.user && !data.session) {
-        setSuccess("Account registration started. Check your email for a confirmation link before signing in.");
+        setSuccess("Registration started. Check your email and open the confirmation link to activate your account.");
       } else {
-        setSuccess("Your account has been created successfully.");
+        window.location.assign("/dashboard");
       }
       setPassword("");
       setConfirmPassword("");
     } catch (caughtError) {
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Unable to create your account. Please try again.",
-      );
+      setError(caughtError instanceof Error ? caughtError.message : "Unable to create your account. Please try again.");
     } finally {
       setBusy(false);
     }
   }
 
+  const inputClass = "w-full rounded-lg border border-slate-300 px-3.5 py-3 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100";
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-900 sm:py-14">
       <div className="mx-auto w-full max-w-lg">
-        <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-indigo-700">
-          <span aria-hidden="true">←</span> Careerotic
-        </Link>
-
+        <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-indigo-700">← Careerotic</Link>
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <div className="mb-7">
-            <p className="text-sm font-semibold text-indigo-700">CAREEROTIC</p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight">Create your account</h1>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Join Careerotic and prepare for your next exam.
-            </p>
-          </div>
-
+          <p className="text-sm font-semibold text-indigo-700">CAREEROTIC</p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight">Create your account</h1>
+          <p className="mt-2 mb-7 text-sm leading-6 text-slate-600">Join Careerotic and prepare for your next exam.</p>
           <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label htmlFor="fullName" className="mb-1.5 block text-sm font-medium">Full Name <span aria-hidden="true">*</span></label>
-              <input id="fullName" name="fullName" autoComplete="name" required maxLength={120} value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Enter your full name" className="w-full rounded-lg border border-slate-300 px-3.5 py-3 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100" />
-            </div>
-
-            <div>
-              <label htmlFor="email" className="mb-1.5 block text-sm font-medium">Email Address <span aria-hidden="true">*</span></label>
-              <input id="email" name="email" type="email" autoComplete="email" required maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" className="w-full rounded-lg border border-slate-300 px-3.5 py-3 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100" />
-            </div>
-
-            <div>
-              <label htmlFor="phoneNumber" className="mb-1.5 block text-sm font-medium">Phone Number <span aria-hidden="true">*</span></label>
-              <input id="phoneNumber" name="phoneNumber" type="tel" autoComplete="tel" required maxLength={30} value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} placeholder="01XXXXXXXXX" className="w-full rounded-lg border border-slate-300 px-3.5 py-3 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100" />
-            </div>
-
-            <div>
-              <label htmlFor="dateOfBirth" className="mb-1.5 block text-sm font-medium">Date of Birth <span aria-hidden="true">*</span></label>
-              <input id="dateOfBirth" name="dateOfBirth" type="date" autoComplete="bday" required max={new Date().toISOString().slice(0, 10)} value={dateOfBirth} onChange={(event) => setDateOfBirth(event.target.value)} className="w-full rounded-lg border border-slate-300 px-3.5 py-3 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100" />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="mb-1.5 block text-sm font-medium">Password <span aria-hidden="true">*</span></label>
-              <input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 8 characters" className="w-full rounded-lg border border-slate-300 px-3.5 py-3 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100" />
-            </div>
-
-            <div>
-              <label htmlFor="confirmPassword" className="mb-1.5 block text-sm font-medium">Confirm Password <span aria-hidden="true">*</span></label>
-              <input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password" required minLength={8} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} aria-invalid={confirmPassword.length > 0 && confirmPassword !== password} aria-describedby="confirmPasswordHelp" placeholder="Re-enter your password" className="w-full rounded-lg border border-slate-300 px-3.5 py-3 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100" />
-              <p id="confirmPasswordHelp" className="mt-1.5 text-xs text-slate-500">Used only to check that both passwords match; it is not saved.</p>
-              {confirmPassword.length > 0 && confirmPassword !== password && <p className="mt-1 text-sm text-red-600">Passwords do not match.</p>}
-            </div>
-
-            <p className="text-sm leading-6 text-slate-600">
-              By creating an account, you acknowledge our{" "}
-              <Link href="/terms" className="font-medium text-indigo-700 underline underline-offset-2">Terms of Service</Link>
-              {" "}and{" "}
-              <Link href="/privacy" className="font-medium text-indigo-700 underline underline-offset-2">Privacy Policy</Link>.
-              No checkbox is required.
-            </p>
-
+            <div><label htmlFor="fullName" className="mb-1.5 block text-sm font-medium">Full Name *</label><input id="fullName" name="fullName" autoComplete="name" required maxLength={120} value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Enter your full name" className={inputClass} /></div>
+            <div><label htmlFor="email" className="mb-1.5 block text-sm font-medium">Email Address *</label><input id="email" name="email" type="email" autoComplete="email" required maxLength={254} value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" className={inputClass} /></div>
+            <div><label htmlFor="phoneNumber" className="mb-1.5 block text-sm font-medium">Phone Number *</label><input id="phoneNumber" name="phoneNumber" type="tel" autoComplete="tel" required maxLength={30} value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} placeholder="01XXXXXXXXX" className={inputClass} /></div>
+            <div><label htmlFor="dateOfBirth" className="mb-1.5 block text-sm font-medium">Date of Birth *</label><input id="dateOfBirth" name="dateOfBirth" type="date" autoComplete="bday" required max={new Date().toLocaleDateString("en-CA")} value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} className={inputClass} /></div>
+            <div><label htmlFor="password" className="mb-1.5 block text-sm font-medium">Password *</label><input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" className={inputClass} /></div>
+            <div><label htmlFor="confirmPassword" className="mb-1.5 block text-sm font-medium">Confirm Password *</label><input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password" required minLength={8} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} aria-invalid={confirmPassword.length > 0 && confirmPassword !== password} placeholder="Re-enter your password" className={inputClass} /><p className="mt-1.5 text-xs text-slate-500">Confirmation is only used to check the match; it is never saved.</p>{confirmPassword.length > 0 && confirmPassword !== password && <p className="mt-1 text-sm text-red-600">Passwords do not match.</p>}</div>
+            <p className="text-sm leading-6 text-slate-600">By creating an account, you acknowledge our <Link href="/terms" className="font-medium text-indigo-700 underline">Terms of Service</Link> and <Link href="/privacy" className="font-medium text-indigo-700 underline">Privacy Policy</Link>. No checkbox is required.</p>
             {error && <p role="alert" className="rounded-lg bg-red-50 px-3.5 py-3 text-sm text-red-700">{error}</p>}
             {success && <p role="status" className="rounded-lg bg-emerald-50 px-3.5 py-3 text-sm text-emerald-800">{success}</p>}
-
-            <button type="submit" disabled={busy || (confirmPassword.length > 0 && confirmPassword !== password)} className="w-full rounded-lg bg-indigo-700 px-4 py-3 font-semibold text-white transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60">
-              {busy ? "Creating account…" : "Create Account"}
-            </button>
+            <button type="submit" disabled={busy || (confirmPassword.length > 0 && confirmPassword !== password)} className="w-full rounded-lg bg-indigo-700 px-4 py-3 font-semibold text-white hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60">{busy ? "Creating account…" : "Create Account"}</button>
           </form>
-
+          <p className="mt-6 text-center text-sm text-slate-600">Already have an account? <Link href="/login" className="font-semibold text-indigo-700 underline">Sign in</Link></p>
         </section>
       </div>
     </main>
