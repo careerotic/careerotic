@@ -34,7 +34,7 @@ export default function GlobalHeader({ onMenuClick, menuOpen, initialUser }: Pro
       setUser({
         email: current.email ?? "",
         fullName: typeof current.user_metadata?.full_name === "string" ? current.user_metadata.full_name : "",
-        isAdmin: false,
+        isAdmin: current.app_metadata?.role === "admin",
       });
     });
     return () => subscription.unsubscribe();
