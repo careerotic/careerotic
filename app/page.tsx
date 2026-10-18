@@ -20,7 +20,7 @@ export default function Home() {
             <Link href="/login" className="rounded-lg border border-slate-300 bg-white px-6 py-3 font-semibold text-slate-800 hover:bg-slate-50">Sign in</Link>
           </div>
         </section>
-        <footer className="border-t border-slate-200 py-6 text-center text-sm text-slate-500">© {new Date().getFullYear()} Careerotic</footer>
+        <footer className="border-t border-slate-200 py-6 text-center text-sm text-slate-500">© 2026 Careerotic</footer>
       </div>
     </main>
   );
