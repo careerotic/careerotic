@@ -162,7 +162,26 @@ export default function ExamAttemptPage() {
     return () => window.clearInterval(timer);
   }, [deadline, serverOffset]);
 
-  if (loading) return <main className="mx-auto max-w-5xl px-3 py-6 sm:px-5"><p className="text-sm text-slate-600">Restoring your saved exam answers…</p></main>;
+  if (loading) return (
+    <main className="mx-auto max-w-5xl px-3 py-4 sm:px-5" aria-busy="true" aria-live="polite">
+      <div className="sticky top-0 z-20 -mx-3 mb-4 border-b border-slate-200 bg-white/95 px-3 py-3 sm:-mx-5 sm:px-5">
+        <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
+        <div className="mt-3 h-2 w-full animate-pulse rounded bg-slate-100" />
+      </div>
+      <p className="mb-4 text-sm text-slate-600">Restoring your saved exam answers…</p>
+      <div className="space-y-3">
+        {Array.from({ length: 3 }, (_, index) => (
+          <section key={index} className="rounded-lg border border-slate-200 p-3 sm:p-4">
+            <div className="mb-4 h-4 w-3/4 animate-pulse rounded bg-slate-200" />
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="h-10 animate-pulse rounded-md bg-slate-100" />
+              <div className="h-10 animate-pulse rounded-md bg-slate-100" />
+            </div>
+          </section>
+        ))}
+      </div>
+    </main>
+  );
   if (error && !questions.length) return <main className="mx-auto max-w-3xl px-3 py-6 sm:px-5"><section role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800"><h1 className="font-semibold">Exam attempt unavailable</h1><p className="mt-2 text-sm">{error}</p><div className="mt-4 flex flex-wrap gap-2"><button onClick={() => void load()} className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white">Try again</button><Link href={"/exam/" + encodeURIComponent(params.slug)} className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold">Exam details</Link></div></section></main>;
   if (!questions.length) return <main className="mx-auto max-w-3xl px-3 py-6 sm:px-5"><p>No questions were returned for this attempt.</p><Link className="mt-3 inline-block underline" href={"/exam/" + encodeURIComponent(params.slug)}>Return to exam details</Link></main>;
 
@@ -188,6 +207,33 @@ export default function ExamAttemptPage() {
           <p className="shrink-0 text-xs font-medium tabular-nums text-slate-600">{answeredCount}/{questions.length} answered</p>
         </div>
       </header>
+
+      <nav aria-label="Question navigation" className="mb-3 rounded-lg border border-slate-200 bg-white p-3">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-xs font-semibold text-slate-800">Jump to question</h2>
+          <p className="text-[11px] text-slate-500">Filled = answered · Outline = unanswered</p>
+        </div>
+        <div className="grid grid-cols-8 gap-1.5 sm:grid-cols-10 md:grid-cols-12">
+          {questions.map((question, index) => {
+            const id = questionIdOf(question);
+            const isAnswered = Boolean(selected[id]);
+            const hasSaveError = saveState[id] === "error";
+            return (
+              <button
+                key={id || index}
+                type="button"
+                aria-label={"Go to question " + (index + 1) + (isAnswered ? ", answered" : ", unanswered")}
+                onClick={() => document.getElementById("question-" + id)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                className={"relative grid min-h-9 place-items-center rounded-md border text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 " +
+                  (hasSaveError ? "border-red-400 bg-red-50 text-red-800" : isAnswered ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100")}
+              >
+                {index + 1}
+                {saveState[id] === "saving" && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-pulse rounded-full bg-amber-400" />}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
 
       {expired && <section role="status" className="mb-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"><h2 className="font-semibold">This attempt has reached its deadline</h2><p className="mt-1">The frozen database does not allow an expired attempt to be submitted as a result. Your saved answers remain subject to the existing expiry and cleanup rules.</p><Link href={"/exam/" + encodeURIComponent(params.slug)} className="mt-2 inline-block font-semibold underline">Return to exam details</Link></section>}
       {error && <p role="alert" className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
@@ -231,7 +277,13 @@ export default function ExamAttemptPage() {
       <footer className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-3 py-2 backdrop-blur">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-slate-600">{unansweredCount === 0 ? "All questions answered" : unansweredCount + " unanswered"} · {pendingCount > 0 ? pendingCount + " saving" : failedCount > 0 ? failedCount + " failed to save" : "Server save status up to date"}</p>
-          <button onClick={() => { if (window.confirm("Submit this exam? Submission is final and answers cannot be changed afterward.")) void submit(); }} disabled={submitting || expired || remaining === 0 || pendingCount > 0 || failedCount > 0 || unansweredCount > 0} className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600">{submitting ? "Submitting…" : expired ? "Attempt expired" : "Submit exam"}</button>
+          <button onClick={() => {
+            if (unansweredCount > 0) {
+              void submit();
+              return;
+            }
+            if (window.confirm("Submit this exam? Submission is final and answers cannot be changed afterward.")) void submit();
+          }} disabled={submitting || expired || remaining === 0 || pendingCount > 0 || failedCount > 0} className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600">{submitting ? "Submitting…" : expired ? "Attempt expired" : unansweredCount > 0 ? "Review unanswered" : "Submit exam"}</button>
         </div>
       </footer>
     </main>
