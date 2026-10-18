@@ -89,11 +89,12 @@ export default function QuestionsPage() {
   useEffect(() => {
     const client = supabase;
     if (!client) return;
+    const db = client as NonNullable<typeof client>;
     let active = true;
     async function loadTaxonomy() {
       const [{ data: subjectRows, error: subjectError }, { data: topicRows, error: topicError }] = await Promise.all([
-        client.from("subjects").select("id,name").order("name"),
-        client.from("topics").select("id,name,subject_id").order("name"),
+        db.from("subjects").select("id,name").order("name"),
+        db.from("topics").select("id,name,subject_id").order("name"),
       ]);
       if (!active) return;
       if (subjectError || topicError) {
@@ -150,13 +151,14 @@ export default function QuestionsPage() {
   useEffect(() => {
     const client = supabase;
     if (!client || questions.length === 0) return;
+    const db = client as NonNullable<typeof client>;
     let active = true;
     async function preloadAnswers() {
       const missing = questions.filter((question) => !answers[question.id]);
       for (let index = 0; index < missing.length; index += 5) {
         const batch = missing.slice(index, index + 5);
         const results = await Promise.all(batch.map(async (question) => {
-          const { data, error: rpcError } = await client.rpc("get_published_question_answer", { p_question_id: question.id });
+          const { data, error: rpcError } = await db.rpc("get_published_question_answer", { p_question_id: question.id });
           if (rpcError) return null;
           const parsed = answerFromJson(data);
           return parsed ? [question.id, parsed] as const : null;
@@ -176,11 +178,12 @@ export default function QuestionsPage() {
   useEffect(() => {
     const client = supabase;
     if (!client) return;
+    const db = client as NonNullable<typeof client>;
     let active = true;
     async function loadBookmarks() {
-      const { data: userResult } = await client.auth.getUser();
+      const { data: userResult } = await db.auth.getUser();
       if (!active || !userResult.user || questions.length === 0) return;
-      const { data } = await client.from("question_bookmarks").select("question_id").in("question_id", questions.map((q) => q.id));
+      const { data } = await db.from("question_bookmarks").select("question_id").in("question_id", questions.map((q) => q.id));
       if (!active) return;
       setBookmarks((current) => {
         const next = { ...current };
