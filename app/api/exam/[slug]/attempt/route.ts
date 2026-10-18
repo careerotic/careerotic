@@ -23,7 +23,7 @@ export async function POST(_request: Request, { params }: Context) {
     const { slug } = await params;
     const participant = await getParticipant();
     const admin = createAdminClient();
-    const { data: exam, error: examError } = await admin
+    const { data: exam, error: examError } = await participant.session
       .from("exams")
       .select("id,title,slug,status,duration_minutes,start_at,end_at")
       .eq("slug", slug)
@@ -36,7 +36,7 @@ export async function POST(_request: Request, { params }: Context) {
       return jsonError("This exam is outside its scheduled availability window.", 409);
     }
 
-    const assignments = await admin.from("exam_questions").select("question_id,question_order").eq("exam_id", exam.id).order("question_order");
+    const assignments = await participant.session.from("exam_questions").select("question_id,question_order").eq("exam_id", exam.id).order("question_order");
     if (assignments.error) throw assignments.error;
     if (!assignments.data?.length) return jsonError("This exam has no assigned questions yet.", 409);
 
@@ -86,6 +86,7 @@ export async function POST(_request: Request, { params }: Context) {
     saveAttemptCookies(participant.store, attemptId, token);
     return responseForAttempt(participant.session, attemptId, token, false);
   } catch (error) {
+    console.error("[exam-attempt-start] Failed to start attempt", error);
     const message = error instanceof Error ? error.message : "Could not start this exam.";
     const status = /SUPABASE_SECRET_KEY|SUPABASE_SERVICE_ROLE_KEY/.test(message) ? 503 : 500;
     return jsonError(status === 503 ? "Secure exam attempts are not configured on this deployment. Please contact the site administrator." : message, status);
