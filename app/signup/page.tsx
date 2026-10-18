@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { useState } from "react";
+import type { FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function SignupPage() {
@@ -129,9 +130,6 @@ export default function SignupPage() {
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-slate-600">
-            Already have an account? <Link href="/login" className="font-semibold text-indigo-700 underline underline-offset-2">Sign in</Link>
-          </p>
         </section>
       </div>
     </main>
