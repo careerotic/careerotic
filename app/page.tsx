@@ -54,7 +54,7 @@ export default async function Home() {
     { count: examCount, error: examError },
   ] = await Promise.all([
     supabase.auth.getUser(),
-    supabase.from("subjects").select("id,name").order("name").limit(8),
+    supabase.from("subjects").select("id,name").order("name"),
     supabase.from("questions").select("id", { count: "exact", head: true }).eq("status", "published"),
     supabase.from("exams").select("id", { count: "exact", head: true }).eq("status", "published"),
   ]);
@@ -125,7 +125,7 @@ export default async function Home() {
           <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-sky-50 text-sky-700"><CompassIcon /></span>
           <div className="min-w-0">
             <p className="text-sm font-medium text-slate-500">Subjects available</p>
-            <p className="mt-1 text-2xl font-bold tracking-tight text-slate-950">{subjectError ? "—" : subjects.length === 8 ? "8+" : subjects.length.toLocaleString()}</p>
+            <p className="mt-1 text-2xl font-bold tracking-tight text-slate-950">{subjectError ? "—" : subjects.length.toLocaleString()}</p>
             <p className="mt-1 text-sm text-slate-600">Browse by subject and topic</p>
           </div>
         </div>
