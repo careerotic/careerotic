@@ -25,9 +25,17 @@ export async function PUT(request: Request) {
     if (snapshotResult.error) throw snapshotResult.error;
     if (!snapshotResult.data) return jsonError("Question does not belong to this attempt.", 400);
 
-    const snapshot = snapshotResult.data.question_snapshot as unknown as { options?: { id?: string; option_id?: string }[] };
-    const validOption = Array.isArray(snapshot.options) && snapshot.options.some((option) => (option.id ?? option.option_id) === body.optionId);
-    if (!validOption) return jsonError("Selected option does not belong to this question.", 400);
+    // The current attempt-start flow stores an empty question_snapshot. Validate
+    // against the frozen question_options table instead of assuming the snapshot
+    // contains options. The database FK also enforces (question_id, option_id).
+    const optionResult = await access.admin
+      .from("question_options")
+      .select("id")
+      .eq("question_id", body.questionId)
+      .eq("id", body.optionId)
+      .maybeSingle();
+    if (optionResult.error) throw optionResult.error;
+    if (!optionResult.data) return jsonError("Selected option does not belong to this question.", 400);
 
     const { error } = await access.admin.from("attempt_answers").upsert({
       attempt_id: access.attempt.id,
