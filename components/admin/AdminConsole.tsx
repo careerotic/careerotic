@@ -55,17 +55,18 @@ export default function AdminConsole({section}:{section:string[]}) {
   if(root==="questions"){
    if(!form.topic_id||!String(form.prompt??"").trim()||options.some(o=>!o.trim()))throw new Error("Question text, topic and all four options are required.");
    const payload={topic_id:form.topic_id,prompt:String(form.prompt).trim(),explanation:String(form.explanation??"").trim()||null,language:form.language==="bn"?"bn":"en",status:form.status==="published"?"published":"draft"};
-   let id=String(form.id??"");if(id){const r=await client.from("questions").update(payload).eq("id",id);error=r.error;}else{const r=await client.from("questions").insert(payload).select("id").single();error=r.error;id=r.data?.id??"";}if(error)throw error;if(!id)throw new Error("Question was saved but its ID was not returned.");
+   const desiredStatus=payload.status;const safePayload={...payload,status:"draft"};let id=String(form.id??"");if(id){const r=await client.from("questions").update(safePayload).eq("id",id);error=r.error;}else{const r=await client.from("questions").insert(safePayload).select("id").single();error=r.error;id=r.data?.id??"";}if(error)throw error;if(!id)throw new Error("Question was saved but its ID was not returned.");
    const old=await client.from("question_options").select("id,option_order").eq("question_id",id).order("option_order");if(old.error)throw old.error;
    if((old.data??[]).length===4){for(let i=0;i<4;i++){const r=await client.from("question_options").update({option_text:options[i].trim(),option_order:i+1,is_correct:i===correct}).eq("id",old.data[i].id);if(r.error)throw r.error;}}
    else{if((old.data??[]).length){const d=await client.from("question_options").delete().eq("question_id",id);if(d.error)throw d.error;}const r=await client.from("question_options").insert(options.map((option,i)=>({question_id:id,option_text:option.trim(),option_order:i+1,is_correct:i===correct})));if(r.error)throw r.error;}
+   const publish=await client.from("questions").update({status:desiredStatus}).eq("id",id);if(publish.error)throw publish.error;
   }else if(root==="subjects"||root==="topics"){
    const name=String(form.name??"").trim();if(!name)throw new Error("Name is required.");
    const slug=String(form.slug??"").trim()||name.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");
    if(root==="subjects"){const r=form.id?await client.from("subjects").update({name,slug}).eq("id",form.id):await client.from("subjects").insert({name,slug});error=r.error;}
    else{if(!form.subject_id)throw new Error("Choose a subject.");const r=form.id?await client.from("topics").update({name,slug,subject_id:form.subject_id}).eq("id",form.id):await client.from("topics").insert({name,slug,subject_id:form.subject_id});error=r.error;}
   }else if(root==="exams"){
-   const title=String(form.title??"").trim();if(!title||!form.category_id)throw new Error("Exam title and category are required.");
+   const title=String(form.title??"").trim();if(!title||!form.category_id)throw new Error("Exam title and category are required.");if(!form.id&&form.status==="published")throw new Error("Create the exam as a draft, assign its questions, then publish it from Edit.");
    const payload={title,slug:String(form.slug??"").trim()||title.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,""),description:String(form.description??"").trim()||null,category_id:form.category_id,duration_minutes:Number(form.duration_minutes),correct_marks:Number(form.correct_marks),negative_marks:Number(form.negative_marks),status:String(form.status??"draft"),start_at:form.start_at||null,end_at:form.end_at||null};
    const r=form.id?await client.from("exams").update(payload).eq("id",form.id):await client.from("exams").insert(payload);error=r.error;
   }
