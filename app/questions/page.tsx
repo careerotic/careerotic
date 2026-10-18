@@ -1,0 +1,331 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+
+type Option = { id: string; question_id: string; option_text: string; option_order: number };
+type Question = {
+  id: string;
+  topic_id: string;
+  prompt: string;
+  language: string;
+  created_at: string;
+  topics: { id: string; name: string; subject_id: string; subjects: { id: string; name: string } | null } | null;
+  question_options: Option[];
+};
+type Answer = { question_id?: string; explanation?: string | null; options?: { id?: string; option_id?: string; option_text?: string; text?: string; option_order?: number }[]; correct_option?: { id?: string; option_id?: string; option_text?: string; text?: string } | null };
+type ReportReason = "incorrect_answer" | "incorrect_question" | "unclear_explanation" | "other";
+
+const PAGE_SIZE = 20;
+const inputClass = "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100";
+const iconButtonClass = "inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-40";
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Something went wrong. Please try again.";
+}
+
+function answerFromJson(value: unknown): Answer | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const nested = (raw.data && typeof raw.data === "object" ? raw.data : raw) as Record<string, unknown>;
+  return {
+    question_id: typeof nested.question_id === "string" ? nested.question_id : undefined,
+    explanation: typeof nested.explanation === "string" ? nested.explanation : null,
+    options: Array.isArray(nested.options) ? nested.options as Answer["options"] : [],
+    correct_option: nested.correct_option && typeof nested.correct_option === "object" ? nested.correct_option as Answer["correct_option"] : null,
+  };
+}
+
+function optionIsCorrect(option: Option, answer: Answer | undefined) {
+  const correct = answer?.correct_option;
+  if (!correct) return false;
+  const correctId = correct.id ?? correct.option_id;
+  const correctText = correct.option_text ?? correct.text;
+  return (Boolean(correctId) && option.id === correctId) || (Boolean(correctText) && option.option_text === correctText);
+}
+
+export default function QuestionsPage() {
+  const [supabase] = useState(() => createClient());
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [subjects, setSubjects] = useState<{ id: string; name: string }[]>([]);
+  const [topics, setTopics] = useState<{ id: string; name: string; subject_id: string }[]>([]);
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [subjectId, setSubjectId] = useState("all");
+  const [topicId, setTopicId] = useState("all");
+  const [language, setLanguage] = useState("all");
+  const [sort, setSort] = useState("newest");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, Answer>>({});
+  const [openAnswers, setOpenAnswers] = useState<Record<string, boolean>>({});
+  const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [reportQuestion, setReportQuestion] = useState<Question | null>(null);
+  const [reportReason, setReportReason] = useState<ReportReason>("incorrect_answer");
+  const [reportDetails, setReportDetails] = useState("");
+  const [reportBusy, setReportBusy] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadTaxonomy() {
+      const [{ data: subjectRows, error: subjectError }, { data: topicRows, error: topicError }] = await Promise.all([
+        supabase.from("subjects").select("id,name").order("name"),
+        supabase.from("topics").select("id,name,subject_id").order("name"),
+      ]);
+      if (!active) return;
+      if (subjectError || topicError) {
+        setError(subjectError?.message ?? topicError?.message ?? "Unable to load filters.");
+        return;
+      }
+      setSubjects(subjectRows ?? []);
+      setTopics(topicRows ?? []);
+    }
+    void loadTaxonomy();
+    return () => { active = false; };
+  }, [supabase]);
+
+  const availableTopics = useMemo(
+    () => topics.filter((topic) => subjectId === "all" || topic.subject_id === subjectId),
+    [topics, subjectId],
+  );
+
+  const loadQuestions = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    setNotice("");
+    const from = (page - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+    let query = supabase
+      .from("questions")
+      .select("id,topic_id,prompt,language,created_at,topics!inner(id,name,subject_id,subjects!inner(id,name)),question_options(id,question_id,option_text,option_order)", { count: "exact" })
+      .eq("status", "published");
+    if (subjectId !== "all") query = query.eq("topics.subject_id", subjectId);
+    if (topicId !== "all") query = query.eq("topic_id", topicId);
+    if (language !== "all") query = query.eq("language", language);
+    if (search) query = query.ilike("prompt", `%${search.replace(/[%_]/g, "\\$&")}%`);
+    query = query.order("created_at", { ascending: sort === "oldest" }).range(from, to);
+    const { data, error: queryError, count } = await query;
+    if (queryError) {
+      setError(queryError.message);
+      setQuestions([]);
+      setTotal(0);
+      setLoading(false);
+      return;
+    }
+    const normalized = ((data ?? []) as unknown as Question[]).map((question) => ({
+      ...question,
+      question_options: [...(question.question_options ?? [])].sort((a, b) => a.option_order - b.option_order),
+    }));
+    setQuestions(normalized);
+    setTotal(count ?? 0);
+    setLoading(false);
+  }, [supabase, page, subjectId, topicId, language, search, sort]);
+
+  useEffect(() => { void loadQuestions(); }, [loadQuestions]);
+
+  useEffect(() => {
+    if (questions.length === 0) return;
+    let active = true;
+    async function preloadAnswers() {
+      const missing = questions.filter((question) => !answers[question.id]);
+      for (let index = 0; index < missing.length; index += 5) {
+        const batch = missing.slice(index, index + 5);
+        const results = await Promise.all(batch.map(async (question) => {
+          const { data, error: rpcError } = await supabase.rpc("get_published_question_answer", { p_question_id: question.id });
+          if (rpcError) return null;
+          const parsed = answerFromJson(data);
+          return parsed ? [question.id, parsed] as const : null;
+        }));
+        if (!active) return;
+        setAnswers((current) => {
+          const next = { ...current };
+          results.forEach((result) => { if (result) next[result[0]] = result[1]; });
+          return next;
+        });
+      }
+    }
+    void preloadAnswers();
+    return () => { active = false; };
+  }, [questions, supabase, answers]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadBookmarks() {
+      const { data: userResult } = await supabase.auth.getUser();
+      if (!active || !userResult.user || questions.length === 0) return;
+      const { data } = await supabase.from("question_bookmarks").select("question_id").in("question_id", questions.map((q) => q.id));
+      if (!active) return;
+      setBookmarks((current) => {
+        const next = { ...current };
+        questions.forEach((q) => { next[q.id] = false; });
+        (data ?? []).forEach((row) => { next[row.question_id] = true; });
+        return next;
+      });
+    }
+    void loadBookmarks();
+    return () => { active = false; };
+  }, [questions, supabase]);
+
+  useEffect(() => { setTopicId("all"); setPage(1); }, [subjectId]);
+  useEffect(() => { setPage(1); }, [topicId, language, sort]);
+
+  async function toggleBookmark(question: Question) {
+    setError("");
+    setNotice("");
+    const { data: userResult, error: authError } = await supabase.auth.getUser();
+    if (authError || !userResult.user) {
+      setNotice("Sign in to save bookmarks.");
+      return;
+    }
+    if (bookmarks[question.id]) {
+      const { error: deleteError } = await supabase.from("question_bookmarks").delete().eq("question_id", question.id).eq("user_id", userResult.user.id);
+      if (deleteError) { setError(deleteError.message); return; }
+      setBookmarks((current) => ({ ...current, [question.id]: false }));
+    } else {
+      const { error: insertError } = await supabase.from("question_bookmarks").insert({ question_id: question.id, user_id: userResult.user.id });
+      if (insertError) { setError(insertError.message); return; }
+      setBookmarks((current) => ({ ...current, [question.id]: true }));
+    }
+  }
+
+  async function submitReport(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!reportQuestion) return;
+    setReportBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const { data: userResult, error: authError } = await supabase.auth.getUser();
+      if (authError || !userResult.user) {
+        setNotice("Sign in to report a question.");
+        return;
+      }
+      const { error: insertError } = await supabase.from("question_reports").insert({
+        question_id: reportQuestion.id,
+        user_id: userResult.user.id,
+        reason: reportReason,
+        details: reportDetails.trim() || null,
+      });
+      if (insertError) throw insertError;
+      setNotice("Thank you. Your report has been submitted.");
+      setReportQuestion(null);
+      setReportDetails("");
+      setReportReason("incorrect_answer");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    } finally {
+      setReportBusy(false);
+    }
+  }
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const firstItem = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const lastItem = Math.min(page * PAGE_SIZE, total);
+
+  return (
+    <main className="min-h-screen bg-slate-50 px-3 py-5 text-slate-900 sm:px-5 sm:py-7">
+      <div className="mx-auto max-w-5xl space-y-4">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Questions</h1>
+            <p className="mt-1 text-sm text-slate-500">Browse published questions by subject and topic.</p>
+          </div>
+          <button type="button" onClick={() => setMobileFiltersOpen((open) => !open)} className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 md:hidden" aria-expanded={mobileFiltersOpen}>
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 6h16M7 12h10m-7 6h4" strokeLinecap="round" /></svg>
+            Filters
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <label className="relative block">
+            <span className="sr-only">Search questions</span>
+            <svg viewBox="0 0 24 24" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 4 4" strokeLinecap="round" /></svg>
+            <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search questions..." className={`${inputClass} pl-9`} />
+          </label>
+          <div className={`${mobileFiltersOpen ? "grid" : "hidden"} grid-cols-1 gap-2 sm:grid-cols-2 md:grid md:grid-cols-4`}>
+            <label className="space-y-1"><span className="text-xs font-medium text-slate-600">Subject</span><select value={subjectId} onChange={(event) => setSubjectId(event.target.value)} className={inputClass}><option value="all">All subjects</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
+            <label className="space-y-1"><span className="text-xs font-medium text-slate-600">Topic</span><select value={topicId} onChange={(event) => setTopicId(event.target.value)} className={inputClass}><option value="all">All topics</option>{availableTopics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select></label>
+            <label className="space-y-1"><span className="text-xs font-medium text-slate-600">Language</span><select value={language} onChange={(event) => setLanguage(event.target.value)} className={inputClass}><option value="all">All languages</option><option value="bn">বাংলা</option><option value="en">English</option></select></label>
+            <label className="space-y-1"><span className="text-xs font-medium text-slate-600">Sort</span><select value={sort} onChange={(event) => setSort(event.target.value)} className={inputClass}><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label>
+          </div>
+        </div>
+
+        {(error || notice) && <div role={error ? "alert" : "status"} className={`rounded-md border px-3 py-2 text-sm ${error ? "border-red-200 bg-red-50 text-red-700" : "border-indigo-100 bg-indigo-50 text-indigo-800"}`}>{error || notice}</div>}
+
+        <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-sm">
+          <span className="font-medium text-slate-700">Question bank</span>
+          <span className="text-slate-500">{loading ? "Loading…" : total === 0 ? "0 questions" : `${firstItem}–${lastItem} of ${total}`}</span>
+        </div>
+
+        {loading ? <div className="space-y-3" aria-label="Loading questions">{Array.from({ length: 4 }, (_, index) => <div key={index} className="animate-pulse rounded-lg border border-slate-200 bg-white p-4"><div className="mb-3 h-3 w-40 rounded bg-slate-200" /><div className="mb-4 h-4 w-3/4 rounded bg-slate-200" /><div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{[1, 2, 3, 4].map((item) => <div key={item} className="h-9 rounded bg-slate-100" />)}</div></div>)}</div>
+          : questions.length === 0 ? <div className="rounded-lg border border-slate-200 bg-white px-4 py-12 text-center"><p className="font-medium text-slate-800">No questions found</p><p className="mt-1 text-sm text-slate-500">Try another search or change your filters.</p></div>
+          : <div className="space-y-3">{questions.map((question) => {
+            const answer = answers[question.id];
+            const isOpen = Boolean(openAnswers[question.id]);
+            const subject = question.topics?.subjects?.name ?? "Subject";
+            const topic = question.topics?.name ?? "Topic";
+            return <article key={question.id} className="rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
+              <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="rounded bg-slate-100 px-2 py-1 font-medium text-slate-700">{subject}</span>
+                <span className="rounded bg-slate-100 px-2 py-1 text-slate-600">{topic}</span>
+                <span className="rounded bg-indigo-50 px-2 py-1 text-indigo-700">{question.language === "bn" ? "বাংলা" : "English"}</span>
+              </div>
+              <h2 className="text-[15px] font-medium leading-6 text-slate-900">{question.prompt}</h2>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {question.question_options.map((option) => {
+                  const correct = isOpen && optionIsCorrect(option, answer);
+                  return <div key={option.id} className={`flex min-w-0 items-start gap-2 rounded-md border px-3 py-2 text-sm ${correct ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-slate-200 text-slate-700"}`}>
+                    <span className="shrink-0 text-slate-400">{String.fromCharCode(64 + option.option_order)}.</span>
+                    <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{option.option_text}</span>
+                    {correct && <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-emerald-700" fill="none" stroke="currentColor" strokeWidth="2" aria-label="Correct answer"><path d="m5 12 4 4L19 6" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                  </div>;
+                })}
+              </div>
+              {isOpen && <div className="mt-3 rounded-md bg-slate-50 px-3 py-3 text-sm">
+                <p className="font-medium text-emerald-800">{answer?.correct_option ? `Correct answer: ${answer.correct_option.option_text ?? answer.correct_option.text ?? question.question_options.find((option) => optionIsCorrect(option, answer))?.option_text ?? ""}` : answer ? "Answer details" : "Answer is loading…"}</p>
+                {answer?.explanation && <p className="mt-1 whitespace-pre-wrap leading-6 text-slate-700">{answer.explanation}</p>}
+                {!answer && <p className="mt-1 text-slate-500">Please wait a moment and try again.</p>}
+              </div>}
+              <div className="mt-3 flex items-center gap-1 border-t border-slate-100 pt-2">
+                <button type="button" onClick={() => setOpenAnswers((current) => ({ ...current, [question.id]: !current[question.id] }))} className="rounded-md px-2.5 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">{isOpen ? "Hide answer" : "Show answer"}</button>
+                <span className="flex-1" />
+                <button type="button" onClick={() => void toggleBookmark(question)} className={iconButtonClass} aria-label={bookmarks[question.id] ? "Remove bookmark" : "Save bookmark"} title={bookmarks[question.id] ? "Remove bookmark" : "Save bookmark"}><svg viewBox="0 0 24 24" className="h-5 w-5" fill={bookmarks[question.id] ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M6 4.75A1.75 1.75 0 0 1 7.75 3h8.5A1.75 1.75 0 0 1 18 4.75V21l-6-3.75L6 21z" strokeLinejoin="round" /></svg></button>
+                <button type="button" onClick={() => { setReportQuestion(question); setReportReason("incorrect_answer"); setReportDetails(""); }} className={iconButtonClass} aria-label="Report question" title="Report question"><svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M5 21V4m0 1c5-4 9 4 14 0v10c-5 4-9-4-14 0" strokeLinecap="round" strokeLinejoin="round" /></svg></button>
+              </div>
+            </article>;
+          })}</div>}
+
+        <nav aria-label="Question pagination" className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3">
+          <p className="text-sm text-slate-500">Page {page} of {totalPages} · 20 per page</p>
+          <div className="flex items-center gap-2">
+            <button type="button" disabled={page <= 1 || loading} onClick={() => { setPage((current) => Math.max(1, current - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40">Previous</button>
+            <button type="button" disabled={page >= totalPages || loading} onClick={() => { setPage((current) => Math.min(totalPages, current + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40">Next</button>
+          </div>
+        </nav>
+      </div>
+
+      {reportQuestion && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !reportBusy) setReportQuestion(null); }}>
+        <section role="dialog" aria-modal="true" aria-labelledby="report-title" className="w-full max-w-md rounded-xl bg-white p-4 shadow-xl">
+          <div className="mb-3 flex items-start justify-between gap-3"><div><h2 id="report-title" className="font-semibold text-slate-900">Report question</h2><p className="mt-1 line-clamp-2 text-sm text-slate-500">{reportQuestion.prompt}</p></div><button type="button" onClick={() => setReportQuestion(null)} disabled={reportBusy} className={iconButtonClass} aria-label="Close report dialog">×</button></div>
+          <form onSubmit={submitReport} className="space-y-3">
+            <label className="block space-y-1"><span className="text-sm font-medium text-slate-700">Reason</span><select className={inputClass} value={reportReason} onChange={(event) => setReportReason(event.target.value as ReportReason)}><option value="incorrect_answer">Incorrect answer</option><option value="incorrect_question">Incorrect question</option><option value="unclear_explanation">Unclear explanation</option><option value="other">Other</option></select></label>
+            <label className="block space-y-1"><span className="text-sm font-medium text-slate-700">Details (optional)</span><textarea className={inputClass} rows={3} maxLength={1000} value={reportDetails} onChange={(event) => setReportDetails(event.target.value)} placeholder="Tell us what needs to be corrected." /></label>
+            <div className="flex justify-end gap-2"><button type="button" disabled={reportBusy} onClick={() => setReportQuestion(null)} className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700">Cancel</button><button type="submit" disabled={reportBusy} className="rounded-md bg-indigo-700 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-800 disabled:opacity-50">{reportBusy ? "Submitting…" : "Submit report"}</button></div>
+          </form>
+        </section>
+      </div>}
+    </main>
+  );
+}
