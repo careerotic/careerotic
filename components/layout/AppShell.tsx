@@ -28,7 +28,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <aside className="sticky top-20 hidden max-h-[calc(100vh-6rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 lg:block">
             <LeftNavigation />
           </aside>
-          <main id="main-content" className="min-w-0">{children}</main>
+          <div id="main-content" className="min-w-0">{children}</div>
           <div className="min-w-0 lg:sticky lg:top-20">
             <RightNavigation />
           </div>
