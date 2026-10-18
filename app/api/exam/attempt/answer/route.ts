@@ -7,7 +7,7 @@ const jsonError = (message: string, status: number) =>
 export async function PUT(request: Request) {
   try {
     const access = await authorizeCurrentAttempt();
-    if ("error" in access) return jsonError(access.error, access.status);
+    if ("error" in access) return jsonError(access.error ?? "No active attempt was found.", access.status);
     if (access.attempt.status !== "in_progress") {
       return jsonError("This attempt is no longer in progress.", 409);
     }
