@@ -4,46 +4,42 @@ import type { Database } from "@/types/database";
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!supabaseUrl || !supabasePublishableKey) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.");
-  }
-
-  const supabase = createServerClient<Database>(supabaseUrl, supabasePublishableKey, {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !key) throw new Error("Missing Supabase public environment variables.");
+  const supabase = createServerClient<Database>(url, key, {
     cookies: {
       getAll: () => request.cookies.getAll(),
-      setAll(cookiesToSet, headers) {
-        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+      setAll(cookies, headers) {
+        cookies.forEach(({ name, value }) => request.cookies.set(name, value));
         response = NextResponse.next({ request });
-        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+        cookies.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
         Object.entries(headers ?? {}).forEach(([name, value]) => response.headers.set(name, value));
       },
     },
   });
-
-  const claimsResult = await supabase.auth.getClaims();
-  const authenticated = Boolean(claimsResult.data && claimsResult.data.claims && !claimsResult.error);
+  const result = await supabase.auth.getClaims();
+  const claims = result.data?.claims as Record<string, any> | undefined;
+  const signedIn = Boolean(claims && !result.error);
   const path = request.nextUrl.pathname;
-  const protectedPath = path === "/dashboard" || path.startsWith("/dashboard/") || path === "/account" || path.startsWith("/account/");
-  const guestOnlyPath = ["/signup", "/login", "/forgot-password"].includes(path);
-
-  if (protectedPath && !authenticated) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.search = "";
-    url.searchParams.set("next", path);
-    return NextResponse.redirect(url);
+  const admin = path === "/admin" || path.startsWith("/admin/");
+  const protectedPath = ["/dashboard", "/account"].some((p) => path === p || path.startsWith(p + "/"));
+  if (admin && !signedIn) {
+    const target = request.nextUrl.clone(); target.pathname = "/login"; target.search = ""; target.searchParams.set("next", path);
+    return NextResponse.redirect(target);
   }
-  if (authenticated && guestOnlyPath) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    url.search = "";
-    return NextResponse.redirect(url);
+  if (admin && claims?.app_metadata?.role !== "admin") {
+    const target = request.nextUrl.clone(); target.pathname = "/dashboard"; target.search = ""; target.searchParams.set("error", "admin_required");
+    return NextResponse.redirect(target);
+  }
+  if (protectedPath && !signedIn) {
+    const target = request.nextUrl.clone(); target.pathname = "/login"; target.search = ""; target.searchParams.set("next", path);
+    return NextResponse.redirect(target);
+  }
+  if (signedIn && ["/signup", "/login", "/forgot-password"].includes(path)) {
+    const target = request.nextUrl.clone(); target.pathname = "/dashboard"; target.search = "";
+    return NextResponse.redirect(target);
   }
   return response;
 }
-
-export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
-};
+export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"] };
