@@ -18,30 +18,25 @@ export async function PUT(request: Request) {
 
     const snapshotResult = await access.admin
       .from("attempt_questions")
-      .select("question_id,question_snapshot")
+      .select("question_id")
       .eq("attempt_id", access.attempt.id)
       .eq("question_id", body.questionId)
       .maybeSingle();
     if (snapshotResult.error) throw snapshotResult.error;
     if (!snapshotResult.data) return jsonError("Question does not belong to this attempt.", 400);
 
-    // The current attempt-start flow stores an empty question_snapshot. Validate
-    // against the frozen question_options table instead of assuming the snapshot
-    // contains options. The database FK also enforces (question_id, option_id).
-    const optionResult = await access.admin
-      .from("question_options")
-      .select("id")
-      .eq("question_id", body.questionId)
-      .eq("id", body.optionId)
-      .maybeSingle();
-    if (optionResult.error) throw optionResult.error;
-    if (!optionResult.data) return jsonError("Selected option does not belong to this question.", 400);
-
+    // Do not SELECT from question_options here: the live frozen database does
+    // not grant the server role SELECT permission on that table. The existing
+    // composite FK (question_id, selected_option_id) validates that the option
+    // belongs to the selected question when the answer is written.
     const { error } = await access.admin.from("attempt_answers").upsert({
       attempt_id: access.attempt.id,
       question_id: body.questionId,
       selected_option_id: body.optionId,
     }, { onConflict: "attempt_id,question_id" });
+    if (error?.code === "23503") {
+      return jsonError("Selected option does not belong to this question.", 400);
+    }
     if (error) throw error;
     return NextResponse.json({ saved: true }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
