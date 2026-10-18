@@ -11,6 +11,7 @@ const card="rounded-2xl border border-slate-200 bg-white shadow-sm";
 const titles:Record<string,string>={questions:"Questions",subjects:"Subjects",topics:"Topics",reports:"Question reports",exams:"Exams",attempts:"Exam attempts",results:"Results",account:"My account"};
 const err=(e:unknown)=>e instanceof Error?e.message:"Something went wrong. Please try again.";
 const fmt=(v:unknown)=>{if(!v)return "—";const d=new Date(String(v));return Number.isNaN(d.getTime())?String(v):d.toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"});};
+const slugify=(value:string)=>value.toLocaleLowerCase().trim().replace(/[^\\p{L}\\p{N}]+/gu,"-").replace(/(^-|-$)/g,"");
 function Alert({notice}:{notice:Notice}){return notice?<div role={notice.kind==="error"?"alert":"status"} className={`mb-4 rounded-xl border px-4 py-3 text-sm ${notice.kind==="error"?"border-red-200 bg-red-50 text-red-700":"border-emerald-200 bg-emerald-50 text-emerald-800"}`}>{notice.text}</div>:null;}
 function Heading({title,description,action}:{title:string;description:string;action?:React.ReactNode}){return <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-indigo-600">Administration</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">{title}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">{description}</p></div>{action}</div>;}
 function Empty({title,detail="No records matched this view."}:{title:string;detail?:string}){return <div className="px-5 py-14 text-center"><p className="font-semibold text-slate-800">{title}</p><p className="mt-1 text-sm text-slate-500">{detail}</p></div>;}
@@ -62,12 +63,12 @@ export default function AdminConsole({section}:{section:string[]}) {
    const publish=await client.from("questions").update({status:desiredStatus}).eq("id",id);if(publish.error)throw publish.error;
   }else if(root==="subjects"||root==="topics"){
    const name=String(form.name??"").trim();if(!name)throw new Error("Name is required.");
-   const slug=String(form.slug??"").trim()||name.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");
+   const slug=String(form.slug??"").trim()||slugify(name);
    if(root==="subjects"){const r=form.id?await client.from("subjects").update({name,slug}).eq("id",form.id):await client.from("subjects").insert({name,slug});error=r.error;}
    else{if(!form.subject_id)throw new Error("Choose a subject.");const r=form.id?await client.from("topics").update({name,slug,subject_id:form.subject_id}).eq("id",form.id):await client.from("topics").insert({name,slug,subject_id:form.subject_id});error=r.error;}
   }else if(root==="exams"){
    const title=String(form.title??"").trim();if(!title||!form.category_id)throw new Error("Exam title and category are required.");if(!form.id&&form.status==="published")throw new Error("Create the exam as a draft, assign its questions, then publish it from Edit.");
-   const payload={title,slug:String(form.slug??"").trim()||title.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,""),description:String(form.description??"").trim()||null,category_id:form.category_id,duration_minutes:Number(form.duration_minutes),correct_marks:Number(form.correct_marks),negative_marks:Number(form.negative_marks),status:String(form.status??"draft"),start_at:form.start_at||null,end_at:form.end_at||null};
+   const payload={title,slug:String(form.slug??"").trim()||slugify(title),description:String(form.description??"").trim()||null,category_id:form.category_id,duration_minutes:Number(form.duration_minutes),correct_marks:Number(form.correct_marks),negative_marks:Number(form.negative_marks),status:String(form.status??"draft"),start_at:form.start_at||null,end_at:form.end_at||null};
    const r=form.id?await client.from("exams").update(payload).eq("id",form.id):await client.from("exams").insert(payload);error=r.error;
   }
   if(error)throw error;setNotice({kind:"success",text:"Saved successfully."});router.push(`/admin/${root}`);router.refresh();
