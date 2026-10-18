@@ -22,8 +22,8 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  const { data: { claims }, error } = await supabase.auth.getClaims();
-  const authenticated = Boolean(claims && !error);
+  const claimsResult = await supabase.auth.getClaims();
+  const authenticated = Boolean(claimsResult.data && claimsResult.data.claims && !claimsResult.error);
   const path = request.nextUrl.pathname;
   const protectedPath = path === "/dashboard" || path.startsWith("/dashboard/");
   const guestOnlyPath = ["/signup", "/login", "/forgot-password"].includes(path);
