@@ -4,8 +4,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 const groups = [
  { label:"Overview", items:[["/admin","Dashboard","▦"]] },
- { label:"Question bank", items:[["/admin/questions","Questions","Q"],["/admin/subjects","Subjects","S"],["/admin/topics","Topics","T"],["/admin/reports","Question reports","⚑"]] },
- { label:"Exams & results", items:[["/admin/exams","Exams","▤"],["/admin/attempts","Attempts","↗"],["/admin/results","Results","▥"]] },
+ { label:"Question bank", items:[["/admin/questions","Questions","Q"],["/admin/subjects","Subjects","S"],["/admin/topics","Topics","T"],["/admin/reports","Question reports","⚑"],["/admin/bookmarks","Bookmarks","☆"]] },
+ { label:"Exams & results", items:[["/admin/categories","Exam categories","C"],["/admin/exams","Exams","▤"],["/admin/attempts","Attempts","↗"],["/admin/results","Results","▥"],["/admin/resets","Reset history","↺"]] },
  { label:"Account", items:[["/admin/account","My account","◎"]] },
 ] as const;
 export default function AdminNavigation({ onNavigate }: { mobile?: boolean; onNavigate?:()=>void }) {
