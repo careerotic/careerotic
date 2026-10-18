@@ -86,6 +86,7 @@ export async function POST(_request: Request, { params }: Context) {
     saveAttemptCookies(participant.store, attemptId, token);
     return responseForAttempt(participant.session, attemptId, token, false);
   } catch (error) {
+    console.error("[exam-attempt-start] Failed to start attempt", error);
     const message = error instanceof Error ? error.message : "Could not start this exam.";
     const status = /SUPABASE_SECRET_KEY|SUPABASE_SERVICE_ROLE_KEY/.test(message) ? 503 : 500;
     return jsonError(status === 503 ? "Secure exam attempts are not configured on this deployment. Please contact the site administrator." : message, status);
