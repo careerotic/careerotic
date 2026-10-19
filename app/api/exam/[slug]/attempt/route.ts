@@ -112,7 +112,7 @@ export async function POST(_request: Request, { params }: Context) {
       if (prior.status === "in_progress") {
         return jsonError("An unfinished attempt already exists, but its secure browser token is unavailable. For safety, a second attempt was not created.", 409);
       }
-      return jsonError("An attempt for this exam already exists and is no longer in progress. Retakes are not enabled by the current database rules.", 409);
+      return NextResponse.json({ state: "expired", error: "This attempt is no longer active. Its time limit may have ended, or the attempt may have been closed. You cannot resume or submit it." }, { status: 409, headers: { "Cache-Control": "no-store" } });
     }
 
     // Existing attempts must be resolved before checking whether new starts are allowed.
