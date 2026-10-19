@@ -67,10 +67,6 @@ export async function POST(_request: Request, { params }: Context) {
     if (examError) throw examError;
     if (!examRow) return jsonError("This exam is not published or no longer exists.", 404);
 
-    const now = Date.now();
-    if ((examRow.start_at && now < new Date(examRow.start_at).getTime()) || (examRow.end_at && now >= new Date(examRow.end_at).getTime())) {
-      return jsonError("This exam is outside its scheduled availability window.", 409);
-    }
     const exam: ExamInfo = {
       title: examRow.title,
       description: examRow.description,
@@ -78,14 +74,6 @@ export async function POST(_request: Request, { params }: Context) {
       correctMarks: examRow.correct_marks,
       negativeMarks: examRow.negative_marks,
     };
-
-    const assignments = await participant.session
-      .from("exam_questions")
-      .select("question_id,question_order")
-      .eq("exam_id", examRow.id)
-      .order("question_order");
-    if (assignments.error) throw assignments.error;
-    if (!assignments.data?.length) return jsonError("This exam has no assigned questions yet.", 409);
 
     let priorQuery = admin
       .from("exam_attempts")
@@ -126,6 +114,21 @@ export async function POST(_request: Request, { params }: Context) {
       }
       return jsonError("An attempt for this exam already exists and is no longer in progress. Retakes are not enabled by the current database rules.", 409);
     }
+
+    // Existing attempts must be resolved before checking whether new starts are allowed.
+    // This lets submitted users reach their result and existing attempts be restored
+    // even if the exam's public start window has since closed.
+    const now = Date.now();
+    if ((examRow.start_at && now < new Date(examRow.start_at).getTime()) || (examRow.end_at && now >= new Date(examRow.end_at).getTime())) {
+      return jsonError("This exam is outside its scheduled availability window.", 409);
+    }
+    const assignments = await participant.session
+      .from("exam_questions")
+      .select("question_id,question_order")
+      .eq("exam_id", examRow.id)
+      .order("question_order");
+    if (assignments.error) throw assignments.error;
+    if (!assignments.data?.length) return jsonError("This exam has no assigned questions yet.", 409);
 
     const token = newAttemptToken();
     const provisionalExpiry = new Date(Date.now() + examRow.duration_minutes * 60_000).toISOString();
