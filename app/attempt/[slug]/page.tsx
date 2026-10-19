@@ -190,8 +190,8 @@ export default function ExamAttemptPage() {
 
   const clock = remaining === null ? "—:—" : String(Math.floor(remaining / 60)).padStart(2, "0") + ":" + String(remaining % 60).padStart(2, "0");
   return (
-    <main className="mx-auto w-full min-w-0 max-w-5xl overflow-x-clip px-2 pb-28 pt-2 sm:px-4 sm:pb-24 sm:pt-4">
-      <header className="sticky top-0 z-20 mb-3 min-w-0 border-b border-slate-200 bg-white/95 px-1 py-2 backdrop-blur sm:px-2">
+    <main className="mx-auto w-full min-w-0 max-w-5xl overflow-x-clip px-2 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-2 sm:px-4 sm:pb-[calc(5rem+env(safe-area-inset-bottom))] sm:pt-4">
+      <header className="sticky top-14 z-30 mb-3 min-w-0 border-b border-slate-200 bg-white/95 px-1 py-2 shadow-sm backdrop-blur sm:px-2">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700">{expired ? "Exam time ended" : "Exam in progress"}</p>
@@ -216,7 +216,7 @@ export default function ExamAttemptPage() {
           <h2 className="text-xs font-semibold text-slate-800">Jump to question</h2>
           <p className="text-[11px] text-slate-500">Filled = answered · Outline = unanswered</p>
         </div>
-        <div className="grid min-w-0 grid-cols-6 gap-1 sm:grid-cols-8 sm:gap-1.5 lg:grid-cols-10 xl:grid-cols-12">
+        <div className="grid min-w-0 grid-cols-8 gap-1 sm:grid-cols-10 sm:gap-1.5 lg:grid-cols-12 xl:grid-cols-14">
           {questions.map((question, index) => {
             const id = questionIdOf(question);
             const isAnswered = Boolean(selected[id]);
@@ -249,7 +249,7 @@ export default function ExamAttemptPage() {
           const currentSelection = selected[questionId] ?? "";
           const status = saveState[questionId];
           return (
-            <section id={"question-" + questionId} key={questionId || index} className="scroll-mt-28 min-w-0 rounded-lg border border-slate-200 bg-white p-2.5 sm:p-4">
+            <section id={"question-" + questionId} key={questionId || index} className="scroll-mt-40 min-w-0 rounded-lg border border-slate-200 bg-white p-2.5 transition-colors hover:border-slate-300 sm:p-4">
               <div className="mb-2 flex min-w-0 items-start gap-2">
                 <span className="grid h-7 w-8 shrink-0 place-items-center rounded-md bg-slate-100 text-xs font-bold text-slate-700">{index + 1}</span>
                 <h2 className="min-w-0 flex-1 break-words whitespace-pre-line text-sm font-semibold leading-6 text-slate-950 sm:text-base">{question.prompt ?? question.question_text ?? "Question text unavailable"}</h2>
@@ -277,7 +277,7 @@ export default function ExamAttemptPage() {
         })}
       </div>
 
-      <footer className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur sm:px-4">
+      <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 shadow-[0_-4px_16px_rgba(15,23,42,0.06)] backdrop-blur sm:px-4">
         <div className="mx-auto flex w-full min-w-0 max-w-5xl flex-col items-stretch justify-between gap-2 sm:flex-row sm:items-center">
           <p className="min-w-0 break-words text-[11px] leading-4 text-slate-600 sm:text-xs">{unansweredCount === 0 ? "All questions answered" : unansweredCount + " unanswered"} · {pendingCount > 0 ? pendingCount + " saving" : failedCount > 0 ? failedCount + " failed to save" : "Server save status up to date"}</p>
           <button onClick={() => {
