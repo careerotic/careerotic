@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import QuestionBankCard from "@/components/questions/QuestionBankCard";
 
 type Option = { id: string; question_id: string; option_text: string; option_order: number };
 type Question = {
@@ -291,41 +292,20 @@ export default function QuestionsPage() {
 
         {loading ? <div className="space-y-3" aria-label="Loading questions">{Array.from({ length: 4 }, (_, index) => <div key={index} className="animate-pulse rounded-lg border border-slate-200 bg-white p-4"><div className="mb-3 h-3 w-40 rounded bg-slate-200" /><div className="mb-4 h-4 w-3/4 rounded bg-slate-200" /><div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{[1, 2, 3, 4].map((item) => <div key={item} className="h-9 rounded bg-slate-100" />)}</div></div>)}</div>
           : questions.length === 0 ? <div className="rounded-lg border border-slate-200 bg-white px-4 py-12 text-center"><p className="font-medium text-slate-800">No questions found</p><p className="mt-1 text-sm text-slate-500">Try another search or change your filters.</p></div>
-          : <div className="space-y-3">{questions.map((question) => {
-            const answer = answers[question.id];
-            const isOpen = Boolean(openAnswers[question.id]);
-            const subject = question.topics?.subjects?.name ?? "Subject";
-            const topic = question.topics?.name ?? "Topic";
-            return <article key={question.id} className="rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
-              <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs">
-                <span className="rounded bg-slate-100 px-2 py-1 font-medium text-slate-700">{subject}</span>
-                <span className="rounded bg-slate-100 px-2 py-1 text-slate-600">{topic}</span>
-                <span className="rounded bg-indigo-50 px-2 py-1 text-indigo-700">{question.language === "bn" ? "বাংলা" : "English"}</span>
-              </div>
-              <h2 className="text-[15px] font-medium leading-6 text-slate-900">{question.prompt}</h2>
-              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {question.question_options.map((option) => {
-                  const correct = isOpen && optionIsCorrect(option, answer);
-                  return <div key={option.id} className={`flex min-w-0 items-start gap-2 rounded-md border px-3 py-2 text-sm ${correct ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-slate-200 text-slate-700"}`}>
-                    <span className="shrink-0 text-slate-400">{String.fromCharCode(64 + option.option_order)}.</span>
-                    <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{option.option_text}</span>
-                    {correct && <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-emerald-700" fill="none" stroke="currentColor" strokeWidth="2" aria-label="Correct answer"><path d="m5 12 4 4L19 6" strokeLinecap="round" strokeLinejoin="round" /></svg>}
-                  </div>;
-                })}
-              </div>
-              {isOpen && <div className="mt-3 rounded-md bg-slate-50 px-3 py-3 text-sm">
-                <p className="font-medium text-emerald-800">{answer?.correct_option ? `Correct answer: ${answer.correct_option.option_text ?? answer.correct_option.text ?? question.question_options.find((option) => optionIsCorrect(option, answer))?.option_text ?? ""}` : answer ? "Answer details" : "Answer is loading…"}</p>
-                {answer?.explanation && <p className="mt-1 whitespace-pre-wrap leading-6 text-slate-700">{answer.explanation}</p>}
-                {!answer && <p className="mt-1 text-slate-500">Please wait a moment and try again.</p>}
-              </div>}
-              <div className="mt-3 flex items-center gap-1 border-t border-slate-100 pt-2">
-                <button type="button" onClick={() => setOpenAnswers((current) => ({ ...current, [question.id]: !current[question.id] }))} className="rounded-md px-2.5 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">{isOpen ? "Hide answer" : "Show answer"}</button>
-                <span className="flex-1" />
-                <button type="button" onClick={() => void toggleBookmark(question)} className={iconButtonClass} aria-label={bookmarks[question.id] ? "Remove bookmark" : "Save bookmark"} title={bookmarks[question.id] ? "Remove bookmark" : "Save bookmark"}><svg viewBox="0 0 24 24" className="h-5 w-5" fill={bookmarks[question.id] ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M6 4.75A1.75 1.75 0 0 1 7.75 3h8.5A1.75 1.75 0 0 1 18 4.75V21l-6-3.75L6 21z" strokeLinejoin="round" /></svg></button>
-                <button type="button" onClick={() => { setReportQuestion(question); setReportReason("incorrect_answer"); setReportDetails(""); }} className={iconButtonClass} aria-label="Report question" title="Report question"><svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M5 21V4m0 1c5-4 9 4 14 0v10c-5 4-9-4-14 0" strokeLinecap="round" strokeLinejoin="round" /></svg></button>
-              </div>
-            </article>;
-          })}</div>}
+          : <div className="space-y-3">{questions.map((question) => (
+              <QuestionBankCard
+                key={question.id}
+                question={question}
+                subject={question.topics?.subjects?.name ?? "Subject"}
+                topic={question.topics?.name ?? "Topic"}
+                answer={answers[question.id]}
+                isOpen={Boolean(openAnswers[question.id])}
+                onToggleAnswer={() => setOpenAnswers((current) => ({ ...current, [question.id]: !current[question.id] }))}
+                bookmarked={Boolean(bookmarks[question.id])}
+                onToggleBookmark={() => void toggleBookmark(question)}
+                onReport={() => { setReportQuestion(question); setReportReason("incorrect_answer"); setReportDetails(""); }}
+              />
+            ))}</div>}
 
         <nav aria-label="Question pagination" className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3">
           <p className="text-sm text-slate-500">Page {page} of {totalPages} · 20 per page</p>
