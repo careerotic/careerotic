@@ -20,4 +20,11 @@ export default function GlobalFooter() {
               <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{group.title}</h2>
               <ul className="flex flex-wrap gap-x-4 gap-y-2 sm:flex-col sm:gap-1.5">
                 {group.links.map((link) => <li key={link.href}><Link href={link.href} className="text-sm text-slate-600 transition hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">{link.label}</Link></li>)}
- ...[truncated]
+              </ul>
+            </nav>
+          ))}
+        </div>
+      </div>
+    </footer>
+  );
+}

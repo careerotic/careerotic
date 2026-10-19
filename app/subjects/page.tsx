@@ -41,4 +41,22 @@ export default async function SubjectsPage() {
             <li key={subject.id}>
               <Link
                 href={`/subjects/${subject.slug}`}
-                className="group flex min-h-14 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-800 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-800 focus-visible:out...[truncated]
+                className="group flex min-h-14 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-800 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+              >
+                <span className="min-w-0 break-words">{subject.name}</span>
+                <span aria-hidden="true" className="shrink-0 text-slate-400 group-hover:text-indigo-700">→</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+          No subjects are available yet. Visit the question bank to check available questions.
+        </p>
+      )}
+      <p className="text-sm text-slate-500">
+        Looking for all practice questions? <Link href="/questions" className="font-semibold text-indigo-700 hover:text-indigo-900">Open the question bank</Link>.
+      </p>
+    </section>
+  );
+}

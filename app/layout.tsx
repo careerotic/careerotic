@@ -20,4 +20,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full">
-        <a href="#main-content" className="sr-only z-[100] rounded-md bg-white px-3 py-2 text-sm font-semibold text-indigo-700 focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Skip to main content</...[truncated]
+        <a href="#main-content" className="sr-only z-[100] rounded-md bg-white px-3 py-2 text-sm font-semibold text-indigo-700 focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Skip to main content</a>
+        <Suspense fallback={<div className="min-h-screen bg-slate-50" />}><AuthAwareAppShell>{children}</AuthAwareAppShell></Suspense>
+      </body>
+    </html>
+  );
+}

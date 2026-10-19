@@ -39,4 +39,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }] : [];
     });
     const examRoutes: MetadataRoute.Sitemap = (exams ?? []).map((exam) => ({
-      url: new URL(`/exam/...[truncated]
+      url: new URL(`/exam/${exam.slug}`, siteUrl).toString(),
+      changeFrequency: "weekly",
+      priority: 0.8,
+    }));
+
+    return [...staticRoutes, ...subjectRoutes, ...topicRoutes, ...examRoutes];
+  } catch {
+    return staticRoutes;
+  }
+}
