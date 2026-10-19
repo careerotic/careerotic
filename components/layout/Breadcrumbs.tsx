@@ -18,6 +18,9 @@ const labels: Record<string, string> = {
   "forgot-password": "Reset password",
   "reset-password": "Choose new password",
   auth: "Authentication",
+  subjects: "Subjects",
+  privacy: "Privacy policy",
+  terms: "Terms of use",
 };
 
 function prettify(segment: string) {
@@ -38,8 +41,8 @@ export default function Breadcrumbs() {
   ];
 
   return (
-    <nav aria-label="Breadcrumb" className="min-w-0 py-4">
-      <ol className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
+    <nav aria-label="Breadcrumb" className="min-w-0 py-2.5">
+      <ol className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs sm:text-sm">
         {items.map((item, index) => {
           const current = index === items.length - 1;
           return (

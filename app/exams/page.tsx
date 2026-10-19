@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 export const metadata = {
   title: "Exams",
   description: "Browse published competitive exams on Careerotic.",
+  alternates: { canonical: "/exams" },
 };
 
 export default async function ExamsPage() {
@@ -34,23 +35,4 @@ export default async function ExamsPage() {
                 <span className="text-sm text-slate-500">{exam.duration_minutes} minutes</span>
               </div>
               <h2 className="mt-4 text-xl font-bold text-slate-950">{exam.title}</h2>
-              <p className="mt-2 line-clamp-3 flex-1 text-sm leading-6 text-slate-600">{exam.description || "Review the instructions and exam schedule before starting."}</p>
-              <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-500">
-                <span>Correct: +{exam.correct_marks}</span>
-                <span>Negative: −{exam.negative_marks}</span>
-              </div>
-              <Link href={`/exam/${encodeURIComponent(exam.slug)}`} className="mt-5 inline-flex justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700">View exam</Link>
-            </article>
-          ))}
-        </div>
-      ) : (
-        <section className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
-          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-slate-100 text-slate-500">◎</div>
-          <h2 className="mt-4 text-lg font-semibold text-slate-900">No published exams yet</h2>
-          <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-600">The question bank is available, but no exams have been published. Please check back after an administrator publishes an exam.</p>
-          <Link href="/questions" className="mt-5 inline-flex rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Explore question bank</Link>
-        </section>
-      )}
-    </main>
-  );
-}
+           ...[truncated]
