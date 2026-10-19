@@ -43,6 +43,7 @@ function CompassIcon() {
 export const metadata = {
   title: "Home",
   description: "Explore the Careerotic question bank and discover published exam practice.",
+  alternates: { canonical: "/" },
 };
 
 export default async function Home() {
@@ -54,7 +55,7 @@ export default async function Home() {
     { count: examCount, error: examError },
   ] = await Promise.all([
     supabase.auth.getUser(),
-    supabase.from("subjects").select("id,name").order("name"),
+    supabase.from("subjects").select("id,name,slug").order("name"),
     supabase.from("questions").select("id", { count: "exact", head: true }).eq("status", "published"),
     supabase.from("exams").select("id", { count: "exact", head: true }).eq("status", "published"),
   ]);
@@ -69,8 +70,8 @@ export default async function Home() {
   const visibleExamCount = examError ? null : examCount;
 
   return (
-    <main className="space-y-6 pb-6 sm:space-y-8">
-      <section className="relative isolate overflow-hidden rounded-3xl bg-slate-950 px-5 py-12 text-white shadow-sm sm:px-10 sm:py-16 lg:px-14 lg:py-20">
+    <main className="space-y-4 pb-4 sm:space-y-5">
+      <section className="relative isolate overflow-hidden rounded-2xl bg-slate-950 px-4 py-8 text-white shadow-sm sm:px-7 sm:py-10 lg:px-9 lg:py-12">
         <div aria-hidden="true" className="absolute -right-16 -top-24 -z-10 h-72 w-72 rounded-full bg-indigo-500/25 blur-3xl sm:h-96 sm:w-96" />
         <div aria-hidden="true" className="absolute -bottom-24 left-1/3 -z-10 h-56 w-56 rounded-full bg-sky-400/10 blur-3xl" />
         <div className="max-w-3xl">
@@ -78,16 +79,16 @@ export default async function Home() {
             <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
             YOUR NEXT STEP STARTS HERE
           </p>
-          <h1 className="mt-6 max-w-3xl text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
+          <h1 className="mt-4 max-w-3xl text-3xl font-bold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
             Prepare smarter.
             <span className="block text-indigo-300">Practice with purpose.</span>
           </h1>
-          <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg sm:leading-8">
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base sm:leading-7">
             {user
               ? `Welcome back${displayName ? `, ${displayName}` : ""}. Keep building your knowledge with the question bank, and check the exams currently available.`
               : "Build confidence one question at a time. Explore the question bank, review answers and explanations, and discover exams when they are published."}
           </p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <Link href="/questions" className={primaryButton}>
               Start practicing <ArrowIcon />
             </Link>
@@ -104,7 +105,7 @@ export default async function Home() {
               </Link>
             )}
           </div>
-          <div className="mt-9 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/10 pt-5 text-sm text-slate-300">
+          <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/10 pt-4 text-xs text-slate-300 sm:text-sm">
             <span className="inline-flex items-center gap-2"><span className="text-emerald-300">✓</span> Practice at your pace</span>
             <span className="inline-flex items-center gap-2"><span className="text-emerald-300">✓</span> Review explanations</span>
             <span className="inline-flex items-center gap-2"><span className="text-emerald-300">✓</span> Track published exams</span>
@@ -112,8 +113,8 @@ export default async function Home() {
         </div>
       </section>
 
-      <section aria-label="Platform overview" className="grid gap-3 sm:grid-cols-3">
-        <div className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-5">
+      <section aria-label="Platform overview" className="grid gap-2 sm:grid-cols-3">
+        <div className="flex items-start gap-4 rounded-xl border border-slate-200 bg-white p-3.5 sm:p-4">
           <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-700"><BookIcon /></span>
           <div className="min-w-0">
             <p className="text-sm font-medium text-slate-500">Published questions</p>
@@ -139,8 +140,8 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-        <article className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
+      <section className="grid gap-3 lg:grid-cols-2">
+        <article className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
           <div className="flex items-start gap-4">
             <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-700"><BookIcon /></span>
             <div>
@@ -185,10 +186,10 @@ export default async function Home() {
         {subjectError ? (
           <p role="status" className="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">Subjects could not be loaded right now. Open the question bank to try again.</p>
         ) : subjects.length ? (
-          <ul className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <ul className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {subjects.map((subject) => (
               <li key={subject.id}>
-                <Link href="/questions" className="group flex min-h-12 items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
+                <Link href={`/subjects/${subject.slug}`} className="group flex min-h-11 items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
                   <span className="truncate">{subject.name}</span>
                   <span className="shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-indigo-700"><ArrowIcon /></span>
                 </Link>
@@ -200,7 +201,7 @@ export default async function Home() {
         )}
       </section>
 
-      <section className="rounded-2xl border border-indigo-100 bg-indigo-50/70 px-5 py-8 sm:px-8 sm:py-10">
+      <section className="rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-5 sm:px-5 sm:py-6">
         <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
           <div>
             <h2 className="text-xl font-bold tracking-tight text-slate-950">{user ? "Ready for your next practice session?" : "Make your next study session count."}</h2>

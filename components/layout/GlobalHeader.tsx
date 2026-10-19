@@ -59,7 +59,7 @@ export default function GlobalHeader({ onMenuClick, menuOpen, initialUser }: Pro
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-screen-2xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-14 max-w-[1600px] items-center justify-between gap-3 px-3 sm:px-4 xl:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"

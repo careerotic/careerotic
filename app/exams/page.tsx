@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 export const metadata = {
   title: "Exams",
   description: "Browse published competitive exams on Careerotic.",
+  alternates: { canonical: "/exams" },
 };
 
 export default async function ExamsPage() {
