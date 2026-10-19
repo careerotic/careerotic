@@ -1,6 +1,6 @@
 import Link from "next/link";
 const footerGroups = [
-  { title: "Explore", links: [{ href: "/", label: "Home" }, { href: "/questions", label: "Question bank" }, { href: "/exams", label: "Published exams" }, { href: "/subjects", label: "Subjects" }] },
+  { title: "Explore", links: [{ href: "/", label: "Home" }, { href: "/questions", label: "Question bank" }, { href: "/exams", label: "Published exams" }, { href: "/exam-categories", label: "Exam categories" }, { href: "/subjects", label: "Subjects" }, { href: "/study-guides", label: "Study guides" }, { href: "/current-affairs", label: "Current affairs" }, { href: "/help", label: "Help & FAQ" }, { href: "/search", label: "Search" }] },
   { title: "Policies", links: [{ href: "/privacy", label: "Privacy policy" }, { href: "/terms", label: "Terms of use" }] },
 ];
 export default function GlobalFooter() {

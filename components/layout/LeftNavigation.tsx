@@ -9,7 +9,17 @@ const links = [
   { href: "/", label: "Home", icon: "⌂" },
   { href: "/questions", label: "Question bank", icon: "?" },
   { href: "/exams", label: "Exams", icon: "▤" },
+  { href: "/exam-categories", label: "Exam categories", icon: "C" },
+  { href: "/subjects", label: "Subjects", icon: "S" },
+  { href: "/study-guides", label: "Study guides", icon: "G" },
+  { href: "/current-affairs", label: "Current affairs", icon: "N" },
+  { href: "/search", label: "Search", icon: "⌕" },
+  { href: "/help", label: "Help & FAQ", icon: "?" },
   { href: "/dashboard", label: "Dashboard", icon: "▦" },
+  { href: "/my-exams", label: "My exams", icon: "E" },
+  { href: "/my-results", label: "My results", icon: "R" },
+  { href: "/saved-questions", label: "Saved questions", icon: "☆" },
+  { href: "/study-plan", label: "Study plan", icon: "✓" },
   { href: "/account", label: "My account", icon: "○" },
 ];
 
