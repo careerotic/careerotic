@@ -1,17 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 type RouteProps = { params: Promise<{ subjectSlug: string }> };
-type TopicRow = {
-  id: string;
-  name: string;
-  slug: string;
-  questions?: { count: number }[];
-};
+type TopicRow = { id: string; name: string; slug: string };
+type TopicCountRow = { topic_id: string };
 
 export async function generateMetadata({ params }: RouteProps): Promise<Metadata> {
+  await connection();
   const { subjectSlug } = await params;
   const supabase = await createClient();
   const { data } = await supabase.from("subjects").select("name").eq("slug", subjectSlug).maybeSingle();
@@ -30,19 +28,49 @@ export default async function SubjectPage({ params }: RouteProps) {
     .eq("slug", subjectSlug)
     .maybeSingle();
 
-  if (subjectError) throw new Error("Unable to load this subject.");
+  if (subjectError) {
+    console.error("Subject lookup failed:", subjectError.message);
+    throw new Error("Unable to load this subject.");
+  }
   if (!subject) notFound();
 
   const { data: topicRows, error: topicsError } = await supabase
     .from("topics")
-    .select("id,name,slug,questions(count)")
+    .select("id,name,slug")
     .eq("subject_id", subject.id)
-    .eq("questions.status", "published")
     .order("name", { ascending: true });
 
-  if (topicsError) throw new Error("Unable to load topics for this subject.");
-  const topics = (topicRows ?? []) as unknown as TopicRow[];
-  const totalQuestions = topics.reduce((sum, topic) => sum + (topic.questions?.[0]?.count ?? 0), 0);
+  if (topicsError) {
+    console.error("Topic lookup failed:", topicsError.message);
+    throw new Error("Unable to load topics for this subject.");
+  }
+
+  const topics = (topicRows ?? []) as TopicRow[];
+  const topicIds = topics.map((topic) => topic.id);
+  let questionCountByTopic = new Map<string, number>();
+
+  // Keep the public topic listing independent of PostgREST's nested aggregate
+  // filtering. The existing schema supports these two direct relationships;
+  // no schema changes or migrations are needed.
+  if (topicIds.length > 0) {
+    const { data: questionRows, error: questionCountError } = await supabase
+      .from("questions")
+      .select("topic_id")
+      .in("topic_id", topicIds)
+      .eq("status", "published");
+
+    if (questionCountError) {
+      console.error("Published question count lookup failed:", questionCountError.message);
+      throw new Error("Unable to load published question counts for this subject.");
+    }
+
+    questionCountByTopic = new Map<string, number>();
+    for (const question of (questionRows ?? []) as TopicCountRow[]) {
+      questionCountByTopic.set(question.topic_id, (questionCountByTopic.get(question.topic_id) ?? 0) + 1);
+    }
+  }
+
+  const totalQuestions = [...questionCountByTopic.values()].reduce((sum, count) => sum + count, 0);
 
   return (
     <main className="min-w-0 space-y-4 text-slate-900">
@@ -68,7 +96,7 @@ export default async function SubjectPage({ params }: RouteProps) {
       ) : (
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {topics.map((topic) => {
-            const count = topic.questions?.[0]?.count ?? 0;
+            const count = questionCountByTopic.get(topic.id) ?? 0;
             return (
               <li key={topic.id}>
                 <Link href={`/subjects/${subject.slug}/${topic.slug}`} className="group flex h-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 transition hover:border-indigo-200 hover:bg-indigo-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
