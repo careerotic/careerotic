@@ -66,7 +66,7 @@ export default async function ExamDetailsPage({ params }: Props) {
         {questionCount === 0 && <p className="mt-5 rounded-lg bg-slate-100 p-3 text-sm text-slate-700">This exam has no assigned questions and cannot be started.</p>}
         {questionCount === null && <p className="mt-5 rounded-lg bg-red-50 p-3 text-sm text-red-700">Question assignments could not be verified. Please try again later.</p>}
         <div className="mt-6">
-          {canStart ? <Link href={`/exam/${encodeURIComponent(exam.slug)}/attempt`} className="inline-flex w-full justify-center rounded-lg bg-indigo-600 px-5 py-3 font-semibold text-white hover:bg-indigo-700 sm:w-auto">Start or resume exam</Link> : <button disabled className="inline-flex cursor-not-allowed rounded-lg bg-slate-300 px-5 py-3 font-semibold text-slate-600">Exam unavailable</button>}
+          {canStart ? <Link href={`/attempt/${encodeURIComponent(exam.slug)}`} className="inline-flex w-full justify-center rounded-lg bg-indigo-600 px-5 py-3 font-semibold text-white hover:bg-indigo-700 sm:w-auto">Start or resume exam</Link> : <button disabled className="inline-flex cursor-not-allowed rounded-lg bg-slate-300 px-5 py-3 font-semibold text-slate-600">Exam unavailable</button>}
         </div>
       </section>
     </main>

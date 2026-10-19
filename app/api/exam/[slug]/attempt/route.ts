@@ -89,7 +89,7 @@ export async function POST(_request: Request, { params }: Context) {
 
     let priorQuery = admin
       .from("exam_attempts")
-      .select("id,status,attempt_token_hash,created_at,last_activity_at,correct_marks_snapshot,negative_marks_snapshot")
+      .select("id,status,attempt_token_hash,created_at,last_activity_at,expires_at,correct_marks_snapshot,negative_marks_snapshot")
       .eq("exam_id", examRow.id);
     priorQuery = participant.userId
       ? priorQuery.eq("user_id", participant.userId)
@@ -107,6 +107,16 @@ export async function POST(_request: Request, { params }: Context) {
 
     if (prior && !staleIncompleteGuest) {
       const savedToken = tokenForAttempt(participant.store, prior.id);
+      if (prior.status === "submitted") {
+        if (savedToken && sha256(savedToken) === prior.attempt_token_hash) {
+          saveAttemptCookies(participant.store, prior.id, savedToken);
+          return NextResponse.json({ state: "completed", redirectTo: `/result/${encodeURIComponent(slug)}` }, { headers: { "Cache-Control": "no-store" } });
+        }
+        return NextResponse.json({ state: "completed", error: "This exam has already been submitted. Open the result from the browser used to complete it, where its secure token is stored." }, { status: 409, headers: { "Cache-Control": "no-store" } });
+      }
+      if (prior.status === "in_progress" && prior.expires_at && Date.now() >= new Date(prior.expires_at).getTime()) {
+        return NextResponse.json({ state: "expired", error: "The allowed time for this attempt has ended. This attempt cannot be resumed or submitted." }, { status: 409, headers: { "Cache-Control": "no-store" } });
+      }
       if (prior.status === "in_progress" && savedToken && sha256(savedToken) === prior.attempt_token_hash) {
         saveAttemptCookies(participant.store, prior.id, savedToken);
         return responseForAttempt(participant.session, prior.id, savedToken, true, exam, prior);
