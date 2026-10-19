@@ -27,7 +27,7 @@ export default function RightNavigation() {
     return () => { active = false; };
   }, []);
   return (
-    <aside aria-label="Browse learning content" className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-1">
+    <aside aria-label="Browse learning content" className="min-w-0">
       <section className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="border-b border-slate-100 px-3 py-2.5">
           <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-indigo-700">Question bank</p>
@@ -47,19 +47,6 @@ export default function RightNavigation() {
           })}
         </nav>
         <div className="border-t border-slate-100 p-1.5"><Link href="/questions" className="block rounded-lg px-2.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">View all questions →</Link></div>
-      </section>
-      <section className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <div className="border-b border-slate-100 px-3 py-2.5"><h2 className="text-sm font-bold text-slate-900">Quick links</h2></div>
-        <nav aria-label="Learning shortcuts" className="grid grid-cols-1 gap-1 p-1.5">
-          <Link href="/questions" className="group flex items-center gap-2.5 rounded-lg p-2 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
-            <span aria-hidden="true" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-indigo-50 text-sm font-bold text-indigo-700">?</span>
-            <span className="min-w-0"><span className="block text-sm font-semibold text-slate-800 group-hover:text-indigo-700">Question bank</span><span className="block text-xs leading-4 text-slate-500">Browse questions and explanations</span></span>
-          </Link>
-          <Link href="/exams" className="group flex items-center gap-2.5 rounded-lg p-2 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
-            <span aria-hidden="true" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-emerald-50 text-sm font-bold text-emerald-700">✓</span>
-            <span className="min-w-0"><span className="block text-sm font-semibold text-slate-800 group-hover:text-indigo-700">Published exams</span><span className="block text-xs leading-4 text-slate-500">Check available practice tests</span></span>
-          </Link>
-        </nav>
       </section>
     </aside>
   );

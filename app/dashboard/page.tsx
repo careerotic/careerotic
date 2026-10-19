@@ -1,53 +1,7 @@
 "use client";
-
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-
-export default function DashboardPage() {
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    void createClient().auth.getClaims().then(({ data }) => {
-      if (active) setIsAdmin((data?.claims as Record<string, any> | undefined)?.app_metadata?.role === "admin");
-    });
-    return () => { active = false; };
-  }, []);
-
-  async function signOut() {
-    setBusy(true);
-    setError("");
-    try {
-      const { error: signOutError } = await createClient().auth.signOut();
-      if (signOutError) throw signOutError;
-      router.replace("/");
-      router.refresh();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to sign out. Please try again.");
-      setBusy(false);
-    }
-  }
-
-  return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-sm font-semibold text-indigo-700">YOUR ACCOUNT</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight">Welcome to Careerotic</h1>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {isAdmin && <Link href="/admin" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Admin panel</Link>}
-          <Link href="/account" className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50">My account</Link>
-          <button onClick={signOut} disabled={busy} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-60">{busy ? "Signing out…" : "Sign out"}</button>
-        </div>
-      </div>
-      <p className="mt-4 leading-7 text-slate-600">You are signed in. This is the starting point for your exam-preparation dashboard; learning features will be connected here as they are implemented.</p>
-      {error && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-    </section>
-  );
-}
+import {useEffect,useState} from "react";
+import {useRouter} from "next/navigation";
+import {createClient} from "@/lib/supabase/client";
+type Attempt={id:string;status:string;started_at:string;exams:{title:string}|null};
+export default function DashboardPage(){const router=useRouter();const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [isAdmin,setIsAdmin]=useState(false);const [loading,setLoading]=useState(true);const [name,setName]=useState("");const [counts,setCounts]=useState<{questions:number|null;exams:number|null;subjects:number|null}>({questions:null,exams:null,subjects:null});const [attempts,setAttempts]=useState<Attempt[]>([]);useEffect(()=>{let active=true;void(async()=>{try{const db=createClient();const [{data:auth},{data:claims},{count:qc},{count:ec},{count:sc}]=await Promise.all([db.auth.getUser(),db.auth.getClaims(),db.from("questions").select("id",{count:"exact",head:true}).eq("status","published"),db.from("exams").select("id",{count:"exact",head:true}).eq("status","published"),db.from("subjects").select("id",{count:"exact",head:true})]);if(!auth.user){router.replace("/login");return}if(!active)return;setName((typeof auth.user.user_metadata?.full_name==="string"&&auth.user.user_metadata.full_name)||auth.user.email?.split("@")[0]||"");setIsAdmin((claims?.claims as Record<string,any>|undefined)?.app_metadata?.role==="admin");setCounts({questions:qc??null,exams:ec??null,subjects:sc??null});const {data}=await db.from("exam_attempts").select("id,status,started_at,exams(title)").eq("user_id",auth.user.id).order("started_at",{ascending:false}).limit(5);if(active)setAttempts((data??[]) as unknown as Attempt[])}catch(e){if(active)setError(e instanceof Error?e.message:"Dashboard data could not be loaded")}finally{if(active)setLoading(false)}})();return()=>{active=false}},[router]);async function signOut(){setBusy(true);setError("");try{const {error}=await createClient().auth.signOut();if(error)throw error;router.replace("/");router.refresh()}catch(e){setError(e instanceof Error?e.message:"Unable to sign out");setBusy(false)}}const cards=[["Published questions",counts.questions,"/questions"],["Published exams",counts.exams,"/exams"],["Subjects",counts.subjects,"/subjects"]];return <main className="space-y-4"><section className="rounded-xl border bg-white p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase text-indigo-700">Your account</p><h1 className="mt-1 text-2xl font-bold">Welcome{name?", "+name:""}!</h1><p className="mt-1 text-sm text-slate-600">Your learning shortcuts and recent exam activity.</p></div><div className="flex flex-wrap gap-2">{isAdmin&&<Link href="/admin" className="rounded-lg bg-indigo-700 px-3 py-2 text-sm font-semibold text-white">Admin panel</Link>}<Link href="/account" className="rounded-lg border px-3 py-2 text-sm font-semibold">My account</Link><button onClick={()=>void signOut()} disabled={busy} className="rounded-lg border px-3 py-2 text-sm font-semibold disabled:opacity-50">{busy?"Signing out…":"Sign out"}</button></div></div>{error&&<p role="alert" className="mt-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}</section><section className="grid gap-2 sm:grid-cols-3">{cards.map(([label,value,href])=><Link key={href as string} href={href as string} className="rounded-xl border bg-white p-3 hover:border-indigo-300"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold">{loading?"—":value===null?"—":value}</p><p className="mt-1 text-xs font-semibold text-indigo-700">Explore →</p></Link>)}</section><section className="rounded-xl border bg-white p-3"><div className="flex items-center justify-between"><h2 className="font-semibold">Recent exam attempts</h2><Link href="/my-exams" className="text-xs font-semibold text-indigo-700">View all →</Link></div>{loading?<p className="mt-3 text-sm text-slate-500">Loading activity…</p>:attempts.length?<ul className="mt-2 divide-y">{attempts.map(a=><li key={a.id} className="flex items-center justify-between gap-2 py-3"><div><p className="text-sm font-semibold">{a.exams?.title??"Exam"}</p><p className="text-xs text-slate-500">{new Date(a.started_at).toLocaleDateString("en-BD",{dateStyle:"medium"})}</p></div><span className="rounded-full bg-slate-100 px-2 py-1 text-xs">{a.status==="submitted"?"Submitted":a.status==="in_progress"?"In progress":a.status}</span></li>)}</ul>:<p className="mt-3 rounded-lg border border-dashed p-3 text-sm text-slate-600">No attempts linked to this account yet. Guest attempts remain tied to their browser identity.</p>}</section><section><h2 className="mb-2 font-semibold">Continue learning</h2><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{[["/questions","Question bank","Practise and reveal explanations."],["/saved-questions","Saved questions","Review bookmarked items."],["/my-results","My results","View submitted attempt history."],["/study-plan","Study plan","Keep a weekly checklist in this browser."],["/study-guides","Study guides","Use structured revision methods."],["/current-affairs","Current affairs","Find official sources for dated facts."]].map(([href,title,desc])=><Link key={href} href={href} className="rounded-xl border bg-white p-3 hover:border-indigo-300"><p className="text-sm font-semibold">{title}</p><p className="mt-1 text-xs text-slate-600">{desc}</p></Link>)}</div></section></main>}

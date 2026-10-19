@@ -67,10 +67,6 @@ export async function POST(_request: Request, { params }: Context) {
     if (examError) throw examError;
     if (!examRow) return jsonError("This exam is not published or no longer exists.", 404);
 
-    const now = Date.now();
-    if ((examRow.start_at && now < new Date(examRow.start_at).getTime()) || (examRow.end_at && now >= new Date(examRow.end_at).getTime())) {
-      return jsonError("This exam is outside its scheduled availability window.", 409);
-    }
     const exam: ExamInfo = {
       title: examRow.title,
       description: examRow.description,
@@ -79,17 +75,9 @@ export async function POST(_request: Request, { params }: Context) {
       negativeMarks: examRow.negative_marks,
     };
 
-    const assignments = await participant.session
-      .from("exam_questions")
-      .select("question_id,question_order")
-      .eq("exam_id", examRow.id)
-      .order("question_order");
-    if (assignments.error) throw assignments.error;
-    if (!assignments.data?.length) return jsonError("This exam has no assigned questions yet.", 409);
-
     let priorQuery = admin
       .from("exam_attempts")
-      .select("id,status,attempt_token_hash,created_at,last_activity_at,correct_marks_snapshot,negative_marks_snapshot")
+      .select("id,status,attempt_token_hash,created_at,last_activity_at,expires_at,correct_marks_snapshot,negative_marks_snapshot")
       .eq("exam_id", examRow.id);
     priorQuery = participant.userId
       ? priorQuery.eq("user_id", participant.userId)
@@ -107,6 +95,16 @@ export async function POST(_request: Request, { params }: Context) {
 
     if (prior && !staleIncompleteGuest) {
       const savedToken = tokenForAttempt(participant.store, prior.id);
+      if (prior.status === "submitted") {
+        if (savedToken && sha256(savedToken) === prior.attempt_token_hash) {
+          saveAttemptCookies(participant.store, prior.id, savedToken);
+          return NextResponse.json({ state: "completed", redirectTo: `/result/${encodeURIComponent(slug)}` }, { headers: { "Cache-Control": "no-store" } });
+        }
+        return NextResponse.json({ state: "completed", error: "This exam has already been submitted. Open the result from the browser used to complete it, where its secure token is stored." }, { status: 409, headers: { "Cache-Control": "no-store" } });
+      }
+      if (prior.status === "in_progress" && prior.expires_at && Date.now() >= new Date(prior.expires_at).getTime()) {
+        return NextResponse.json({ state: "expired", error: "The allowed time for this attempt has ended. This attempt cannot be resumed or submitted." }, { status: 409, headers: { "Cache-Control": "no-store" } });
+      }
       if (prior.status === "in_progress" && savedToken && sha256(savedToken) === prior.attempt_token_hash) {
         saveAttemptCookies(participant.store, prior.id, savedToken);
         return responseForAttempt(participant.session, prior.id, savedToken, true, exam, prior);
@@ -114,8 +112,23 @@ export async function POST(_request: Request, { params }: Context) {
       if (prior.status === "in_progress") {
         return jsonError("An unfinished attempt already exists, but its secure browser token is unavailable. For safety, a second attempt was not created.", 409);
       }
-      return jsonError("An attempt for this exam already exists and is no longer in progress. Retakes are not enabled by the current database rules.", 409);
+      return NextResponse.json({ state: "expired", error: "This attempt is no longer active. Its time limit may have ended, or the attempt may have been closed. You cannot resume or submit it." }, { status: 409, headers: { "Cache-Control": "no-store" } });
     }
+
+    // Existing attempts must be resolved before checking whether new starts are allowed.
+    // This lets submitted users reach their result and existing attempts be restored
+    // even if the exam's public start window has since closed.
+    const now = Date.now();
+    if ((examRow.start_at && now < new Date(examRow.start_at).getTime()) || (examRow.end_at && now >= new Date(examRow.end_at).getTime())) {
+      return jsonError("This exam is outside its scheduled availability window.", 409);
+    }
+    const assignments = await participant.session
+      .from("exam_questions")
+      .select("question_id,question_order")
+      .eq("exam_id", examRow.id)
+      .order("question_order");
+    if (assignments.error) throw assignments.error;
+    if (!assignments.data?.length) return jsonError("This exam has no assigned questions yet.", 409);
 
     const token = newAttemptToken();
     const provisionalExpiry = new Date(Date.now() + examRow.duration_minutes * 60_000).toISOString();

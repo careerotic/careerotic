@@ -1,12 +1,12 @@
 import Link from "next/link";
 const footerGroups = [
-  { title: "Explore", links: [{ href: "/", label: "Home" }, { href: "/questions", label: "Question bank" }, { href: "/exams", label: "Published exams" }, { href: "/subjects", label: "Subjects" }] },
+  { title: "Explore", links: [{ href: "/", label: "Home" }, { href: "/questions", label: "Question bank" }, { href: "/exams", label: "Published exams" }, { href: "/exam-categories", label: "Exam categories" }, { href: "/subjects", label: "Subjects" }, { href: "/study-guides", label: "Study guides" }, { href: "/current-affairs", label: "Current affairs" }, { href: "/help", label: "Help & FAQ" }, { href: "/search", label: "Search" }] },
   { title: "Policies", links: [{ href: "/privacy", label: "Privacy policy" }, { href: "/terms", label: "Terms of use" }] },
 ];
 export default function GlobalFooter() {
   return (
     <footer className="mt-auto border-t border-slate-200 bg-white">
-      <div className="mx-auto grid w-full max-w-[1600px] grid-cols-1 gap-5 px-3 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:px-4 xl:px-5">
+      <div className="mx-auto grid w-full max-w-[1440px] grid-cols-1 gap-5 px-3 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:px-4 xl:px-5">
         <div className="min-w-0">
           <Link href="/" className="inline-flex items-center gap-2 rounded-md font-bold tracking-tight text-slate-900 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
             <span aria-hidden="true" className="grid h-7 w-7 place-items-center rounded-lg bg-indigo-700 text-xs font-black text-white">C</span>Careerotic
