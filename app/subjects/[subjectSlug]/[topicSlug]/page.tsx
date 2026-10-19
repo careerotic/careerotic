@@ -28,6 +28,7 @@ export async function generateMetadata({ params }: RouteProps): Promise<Metadata
   return {
     title: topic?.name ? `${topic.name} questions` : "Topic questions",
     description: topic?.name ? `Practise published ${topic.name} questions in ${subject.name} on Careerotic.` : "Practise questions from the Careerotic question bank.",
+    alternates: { canonical: "/subjects/" + subjectSlug + "/" + topicSlug },
   };
 }
 
