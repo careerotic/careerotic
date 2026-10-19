@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import TopicQuestionList from "@/components/questions/TopicQuestionList";
 import { createClient } from "@/lib/supabase/server";
 
@@ -18,6 +19,7 @@ type QuestionRow = {
 };
 
 export async function generateMetadata({ params }: RouteProps): Promise<Metadata> {
+  await connection();
   const { subjectSlug, topicSlug } = await params;
   const supabase = await createClient();
   const { data: subject } = await supabase.from("subjects").select("id,name").eq("slug", subjectSlug).maybeSingle();
