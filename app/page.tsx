@@ -2,9 +2,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
 const primaryButton =
-  "inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-indigo-700 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2";
+  "inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-indigo-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2";
 const secondaryButton =
-  "inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2";
+  "inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2";
 
 function ArrowIcon() {
   return (
@@ -14,35 +14,10 @@ function ArrowIcon() {
   );
 }
 
-function BookIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-6 w-6">
-      <path d="M4.75 5.75A2.75 2.75 0 0 1 7.5 3h12v16h-12a2.75 2.75 0 0 0-2.75 2.75zM4.75 5.75v16M8 7h8M8 10.5h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function ExamIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-6 w-6">
-      <rect x="5" y="3.5" width="14" height="17" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
-      <path d="m8.5 9 1.5 1.5L13 7.5M14.5 10H16M8.5 15h7M8.5 17.5h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function CompassIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-6 w-6">
-      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.6" />
-      <path d="m15.5 8.5-2 5-5 2 2-5z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 export const metadata = {
-  title: "Home",
-  description: "Explore the Careerotic question bank and discover published exam practice.",
+  title: "Exam Practice & Question Bank",
+  description:
+    "Practise with published questions, review answers and explanations, and take available competitive exam practice tests on Careerotic.",
   alternates: { canonical: "/" },
 };
 
@@ -50,14 +25,17 @@ export default async function Home() {
   const supabase = await createClient();
   const [
     { data: userResult },
-    { data: subjectRows, error: subjectError },
     { count: questionCount, error: questionError },
-    { count: examCount, error: examError },
+    { data: exams, error: examError },
   ] = await Promise.all([
     supabase.auth.getUser(),
-    supabase.from("subjects").select("id,name,slug").order("name"),
     supabase.from("questions").select("id", { count: "exact", head: true }).eq("status", "published"),
-    supabase.from("exams").select("id", { count: "exact", head: true }).eq("status", "published"),
+    supabase
+      .from("exams")
+      .select("id,title,slug,description,duration_minutes,category_id,exam_categories(name)")
+      .eq("status", "published")
+      .order("start_at", { ascending: true, nullsFirst: false })
+      .limit(3),
   ]);
 
   const user = userResult.user;
@@ -65,158 +43,77 @@ export default async function Home() {
     (typeof user?.user_metadata?.full_name === "string" && user.user_metadata.full_name.trim()) ||
     user?.email?.split("@")[0] ||
     "";
-  const subjects = subjectError ? [] : subjectRows ?? [];
-  const visibleQuestionCount = questionError ? null : questionCount;
-  const visibleExamCount = examError ? null : examCount;
+  const publishedQuestionCount = questionError ? null : questionCount;
+  const availableExams = examError ? [] : exams ?? [];
 
   return (
-    <main className="space-y-4 pb-4 sm:space-y-5">
-      <section className="relative isolate overflow-hidden rounded-2xl bg-slate-950 px-4 py-8 text-white shadow-sm sm:px-7 sm:py-10 lg:px-9 lg:py-12">
-        <div aria-hidden="true" className="absolute -right-16 -top-24 -z-10 h-72 w-72 rounded-full bg-indigo-500/25 blur-3xl sm:h-96 sm:w-96" />
-        <div aria-hidden="true" className="absolute -bottom-24 left-1/3 -z-10 h-56 w-56 rounded-full bg-sky-400/10 blur-3xl" />
-        <div className="max-w-3xl">
-          <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold tracking-wide text-indigo-200">
-            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            YOUR NEXT STEP STARTS HERE
-          </p>
-          <h1 className="mt-4 max-w-3xl text-3xl font-bold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
-            Prepare smarter.
-            <span className="block text-indigo-300">Practice with purpose.</span>
+    <main id="main-content" className="space-y-5 pb-4">
+      <section className="rounded-xl bg-slate-950 px-4 py-7 text-white sm:px-6 sm:py-8">
+        <div className="max-w-2xl">
+          <p className="text-xs font-semibold uppercase tracking-wider text-indigo-300">Careerotic</p>
+          <h1 className="mt-2 text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
+            Practice. Learn. Improve.
           </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base sm:leading-7">
+          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-300">
             {user
-              ? `Welcome back${displayName ? `, ${displayName}` : ""}. Keep building your knowledge with the question bank, and check the exams currently available.`
-              : "Build confidence one question at a time. Explore the question bank, review answers and explanations, and discover exams when they are published."}
+              ? `Welcome back${displayName ? `, ${displayName}` : ""}. Continue practising or explore the exams currently available.`
+              : "Practise with questions, reveal answers and explanations, and take published exam practice tests."}
           </p>
-          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <div className="mt-4 flex flex-wrap gap-2">
             <Link href="/questions" className={primaryButton}>
-              Start practicing <ArrowIcon />
+              Browse Questions <ArrowIcon />
             </Link>
-            <Link href="/exams" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">
-              Explore exams <ArrowIcon />
+            <Link href="/exams" className={secondaryButton}>
+              Explore Exams <ArrowIcon />
             </Link>
-            {user ? (
-              <Link href="/dashboard" className="inline-flex min-h-12 items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
-                Go to dashboard
-              </Link>
-            ) : (
-              <Link href="/signup" className="inline-flex min-h-12 items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
-                Create an account <ArrowIcon />
-              </Link>
-            )}
           </div>
-          <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/10 pt-4 text-xs text-slate-300 sm:text-sm">
-            <span className="inline-flex items-center gap-2"><span className="text-emerald-300">✓</span> Practice at your pace</span>
-            <span className="inline-flex items-center gap-2"><span className="text-emerald-300">✓</span> Review explanations</span>
-            <span className="inline-flex items-center gap-2"><span className="text-emerald-300">✓</span> Track published exams</span>
-          </div>
+          {publishedQuestionCount !== null && (
+            <p className="mt-4 text-xs text-slate-400">
+              {publishedQuestionCount.toLocaleString()} published questions available
+            </p>
+          )}
         </div>
       </section>
 
-      <section aria-label="Platform overview" className="grid gap-2 sm:grid-cols-3">
-        <div className="flex items-start gap-4 rounded-xl border border-slate-200 bg-white p-3.5 sm:p-4">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-700"><BookIcon /></span>
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-slate-500">Published questions</p>
-            <p className="mt-1 text-2xl font-bold tracking-tight text-slate-950">{visibleQuestionCount === null ? "—" : visibleQuestionCount.toLocaleString()}</p>
-            <p className="mt-1 text-sm text-slate-600">Explore the question bank</p>
+      {availableExams.length > 0 && (
+        <section aria-labelledby="available-exams-heading" className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <h2 id="available-exams-heading" className="text-lg font-bold tracking-tight text-slate-950">
+              Available exams
+            </h2>
+            <Link
+              href="/exams"
+              className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-indigo-700 hover:text-indigo-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+            >
+              View all <ArrowIcon />
+            </Link>
           </div>
-        </div>
-        <div className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-5">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-sky-50 text-sky-700"><CompassIcon /></span>
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-slate-500">Subjects available</p>
-            <p className="mt-1 text-2xl font-bold tracking-tight text-slate-950">{subjectError ? "—" : subjects.length.toLocaleString()}</p>
-            <p className="mt-1 text-sm text-slate-600">Browse by subject and topic</p>
-          </div>
-        </div>
-        <div className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-5">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-700"><ExamIcon /></span>
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-slate-500">Published exams</p>
-            <p className="mt-1 text-2xl font-bold tracking-tight text-slate-950">{visibleExamCount === null ? "—" : visibleExamCount.toLocaleString()}</p>
-            <p className="mt-1 text-sm text-slate-600">Only real, published exams</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-3 lg:grid-cols-2">
-        <article className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-          <div className="flex items-start gap-4">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-700"><BookIcon /></span>
-            <div>
-              <p className="text-sm font-semibold text-indigo-700">PRACTICE</p>
-              <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">Learn one question at a time</h2>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">Browse published questions, filter by subject or topic, and reveal the correct answer and explanation when you are ready.</p>
-              <Link href="/questions" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-indigo-700 hover:text-indigo-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
-                Open question bank <ArrowIcon />
-              </Link>
-            </div>
-          </div>
-        </article>
-        <article className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
-          <div className="flex items-start gap-4">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-sky-50 text-sky-700"><ExamIcon /></span>
-            <div>
-              <p className="text-sm font-semibold text-sky-700">EXAMS</p>
-              <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">Prepare for exam day</h2>
-              <p className="mt-3 text-sm leading-6 text-slate-600">Review available exam instructions, timing and marking rules. The list only includes exams published by an administrator.</p>
-              {visibleExamCount === 0 ? (
-                <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">No exams are published yet. You can practice with questions in the meantime.</p>
-              ) : null}
-              <Link href="/exams" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-indigo-700 hover:text-indigo-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
-                View available exams <ArrowIcon />
-              </Link>
-            </div>
-          </div>
-        </article>
-      </section>
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
-        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-          <div>
-            <p className="text-sm font-semibold text-indigo-700">FIND YOUR FOCUS</p>
-            <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">Explore subjects</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Start with a subject that matches what you want to learn. Choose a subject in the question bank to narrow the practice list.</p>
-          </div>
-          <Link href="/questions" className="inline-flex items-center gap-2 text-sm font-semibold text-indigo-700 hover:text-indigo-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
-            Browse all questions <ArrowIcon />
-          </Link>
-        </div>
-        {subjectError ? (
-          <p role="status" className="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">Subjects could not be loaded right now. Open the question bank to try again.</p>
-        ) : subjects.length ? (
-          <ul className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {subjects.map((subject) => (
-              <li key={subject.id}>
-                <Link href={`/subjects/${subject.slug}`} className="group flex min-h-11 items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
-                  <span className="truncate">{subject.name}</span>
-                  <span className="shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-indigo-700"><ArrowIcon /></span>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {availableExams.map((exam) => (
+              <article key={exam.id} className="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-3.5">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <span className="rounded-md bg-indigo-50 px-2 py-1 font-semibold text-indigo-700">
+                    {exam.exam_categories?.name ?? "Exam"}
+                  </span>
+                  {exam.duration_minutes !== null && (
+                    <span>{exam.duration_minutes} minutes</span>
+                  )}
+                </div>
+                <h3 className="mt-2 text-base font-semibold leading-6 text-slate-950">{exam.title}</h3>
+                {exam.description && (
+                  <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-600">{exam.description}</p>
+                )}
+                <Link
+                  href={`/exam/${encodeURIComponent(exam.slug)}`}
+                  className="mt-3 inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-indigo-700 hover:text-indigo-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+                >
+                  View exam <ArrowIcon />
                 </Link>
-              </li>
+              </article>
             ))}
-          </ul>
-        ) : (
-          <p className="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">Subject information is not available right now. Visit the question bank to explore available content.</p>
-        )}
-      </section>
-
-      <section className="rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-5 sm:px-5 sm:py-6">
-        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-slate-950">{user ? "Ready for your next practice session?" : "Make your next study session count."}</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{user ? "Continue with the question bank or check the exams currently available." : "Start exploring the public question bank, or create an account to access your account area."}</p>
           </div>
-          <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
-            <Link href="/questions" className={primaryButton}>Practice questions <ArrowIcon /></Link>
-            {user ? (
-              <Link href="/dashboard" className={secondaryButton}>Dashboard</Link>
-            ) : (
-              <Link href="/signup" className={secondaryButton}>Create account</Link>
-            )}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
     </main>
   );
 }
