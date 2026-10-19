@@ -42,7 +42,7 @@ export default function AppShell({ children, initialUser }: Props) {
       <MobileNavigationDrawer open={drawerOpen} onClose={closeMenu} />
       <div className="mx-auto w-full max-w-[1440px] flex-1 px-3 sm:px-4 lg:px-4">
         <Breadcrumbs />
-        <div className="grid min-w-0 grid-cols-1 gap-3 pb-5 lg:grid-cols-[10rem_minmax(0,1fr)] xl:grid-cols-[10rem_minmax(0,1fr)_11rem] xl:gap-3">
+        <div className="grid min-w-0 grid-cols-1 gap-3 pb-5 lg:grid-cols-[11rem_minmax(0,1fr)] xl:grid-cols-[11rem_minmax(0,1fr)_14rem] xl:gap-3">
           <aside className="sticky top-[4.5rem] hidden max-h-[calc(100vh-5.25rem)] overflow-y-auto self-start rounded-lg border border-slate-200 bg-white p-2 lg:block">
             <LeftNavigation />
           </aside>
