@@ -26,33 +26,40 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const supabase = await createClient();
-    const [{ data: subjects }, { data: exams }, { data: topics }] = await Promise.all([
+    const [{ data: subjects, error: subjectsError }, { data: exams, error: examsError }, { data: topics, error: topicsError }] = await Promise.all([
       supabase.from("subjects").select("id,slug"),
       supabase.from("exams").select("slug").eq("status", "published"),
-      supabase.from("topics").select("slug,subject_id"),
+      supabase.from("topics").select("id,slug,subject_id"),
     ]);
+    if (subjectsError || examsError || topicsError) return staticRoutes;
 
-    const subjectRows = subjects ?? [];
-    const subjectById = new Map(subjectRows.map((subject) => [subject.id, subject.slug]));
-    const subjectRoutes: MetadataRoute.Sitemap = subjectRows.map((subject) => ({
-      url: new URL(`/subjects/${subject.slug}`, siteUrl).toString(),
-      changeFrequency: "weekly",
-      priority: 0.7,
-    }));
-    const topicRoutes: MetadataRoute.Sitemap = (topics ?? []).flatMap((topic) => {
+    // Only include subject/topic pages backed by published questions.
+    // Paginate through the frozen question bank to avoid PostgREST row-limit truncation.
+    const publishedTopicIds = new Set<string>();
+    const pageSize = 1000;
+    for (let offset = 0; ; offset += pageSize) {
+      const { data: questionRows, error: questionsError } = await supabase
+        .from("questions").select("topic_id").eq("status", "published")
+        .range(offset, offset + pageSize - 1);
+      if (questionsError) return staticRoutes;
+      const rows = questionRows ?? [];
+      rows.forEach((question) => publishedTopicIds.add(question.topic_id));
+      if (rows.length < pageSize) break;
+    }
+
+    const topicRows = (topics ?? []).filter((topic) => publishedTopicIds.has(topic.id));
+    const subjectsWithPublishedQuestions = new Set(topicRows.map((topic) => topic.subject_id));
+    const subjectRoutes: MetadataRoute.Sitemap = (subjects ?? [])
+      .filter((subject) => subjectsWithPublishedQuestions.has(subject.id))
+      .map((subject) => ({ url: new URL("/subjects/" + subject.slug, siteUrl).toString(), changeFrequency: "weekly", priority: 0.7 }));
+    const subjectById = new Map((subjects ?? []).map((subject) => [subject.id, subject.slug]));
+    const topicRoutes: MetadataRoute.Sitemap = topicRows.flatMap((topic) => {
       const subjectSlug = subjectById.get(topic.subject_id);
-      return subjectSlug ? [{
-        url: new URL(`/subjects/${subjectSlug}/${topic.slug}`, siteUrl).toString(),
-        changeFrequency: "weekly" as const,
-        priority: 0.6,
-      }] : [];
+      return subjectSlug ? [{ url: new URL("/subjects/" + subjectSlug + "/" + topic.slug, siteUrl).toString(), changeFrequency: "weekly" as const, priority: 0.6 }] : [];
     });
     const examRoutes: MetadataRoute.Sitemap = (exams ?? []).map((exam) => ({
-      url: new URL(`/exam/${exam.slug}`, siteUrl).toString(),
-      changeFrequency: "weekly",
-      priority: 0.8,
+      url: new URL("/exam/" + exam.slug, siteUrl).toString(), changeFrequency: "weekly", priority: 0.8,
     }));
-
     return [...staticRoutes, ...subjectRoutes, ...topicRoutes, ...examRoutes];
   } catch {
     return staticRoutes;
