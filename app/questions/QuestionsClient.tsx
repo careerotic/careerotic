@@ -17,7 +17,7 @@ type Question = {
 type Answer = { question_id?: string; explanation?: string | null; options?: { id?: string; option_id?: string; option_text?: string; text?: string; option_order?: number }[]; correct_option?: { id?: string; option_id?: string; option_text?: string; text?: string } | null };
 type ReportReason = "incorrect_answer" | "incorrect_question" | "unclear_explanation" | "other";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 25;
 const inputClass = "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100";
 const iconButtonClass = "inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-40";
 function getErrorMessage(error: unknown) {
@@ -37,7 +37,7 @@ function answerFromJson(value: unknown): Answer | null {
 }
 
 
-export default function QuestionsClient({ initialQuestions, initialLoadFailed = false }: { initialQuestions: Question[]; initialLoadFailed?: boolean }) {
+export default function QuestionsClient({ initialQuestions, initialLoadFailed = false, initialPage = 1, initialTotal = 0 }: { initialQuestions: Question[]; initialLoadFailed?: boolean; initialPage?: number; initialTotal?: number }) {
   const [supabase, setSupabase] = useState<ReturnType<typeof createClient> | null>(null);
 
   useEffect(() => {
@@ -57,8 +57,8 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
   const [topicId, setTopicId] = useState("all");
   const [language, setLanguage] = useState("all");
   const [sort, setSort] = useState("newest");
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(initialPage);
+  const [total, setTotal] = useState(initialTotal);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [openAnswers, setOpenAnswers] = useState<Record<string, boolean>>({});
   const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
@@ -121,7 +121,7 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     if (topicId !== "all") query = query.eq("topic_id", topicId);
     if (language !== "all") query = query.eq("language", language);
     if (search) query = query.ilike("prompt", `%${search.replace(/[%_]/g, "\\$&")}%`);
-    query = query.order("created_at", { ascending: sort === "oldest" }).range(from, to);
+    query = query.order("created_at", { ascending: sort === "oldest" }).order("id", { ascending: true }).range(from, to);
     const { data, error: queryError, count } = await query;
     if (queryError) {
       setError(queryError.message);
@@ -300,10 +300,11 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
             ))}</div>}
 
         <nav aria-label="Question pagination" className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3">
-          <p className="text-sm text-slate-500">Page {page} of {totalPages} · 20 per page</p>
+          <p className="text-sm text-slate-500">Page {page} of {totalPages} · 25 per page</p>
           <div className="flex items-center gap-2">
-            <button type="button" disabled={page <= 1 || loading} onClick={() => { setPage((current) => Math.max(1, current - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40">Previous</button>
-            <button type="button" disabled={page >= totalPages || loading} onClick={() => { setPage((current) => Math.min(totalPages, current + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40">Next</button>
+            {page > 1 ? <a href={page === 2 ? "/questions" : `/questions?page=${page - 1}`} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Previous</a> : <span aria-disabled="true" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm opacity-40">Previous</span>}
+            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => Math.max(1, Math.min(page - 2, totalPages - 4)) + i).map((number) => <a key={number} href={number === 1 ? "/questions" : `/questions?page=${number}`} aria-current={number === page ? "page" : undefined} className={`rounded-md border px-3 py-2 text-sm font-medium ${number === page ? "border-indigo-600 bg-indigo-50 text-indigo-800" : "border-slate-300 bg-white text-slate-700"}`}>{number}</a>)}
+            {page < totalPages ? <a href={`/questions?page=${page + 1}`} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Next</a> : <span aria-disabled="true" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm opacity-40">Next</span>}
           </div>
         </nav>
       </div>
