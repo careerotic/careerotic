@@ -7,6 +7,11 @@ import "./globals.css";
 const siteUrl = "https://careerotic.vercel.app";
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+
+// Auth/session-dependent pages must wait for the request rather than trying to
+// produce an instant static shell during prerendering.
+export const instant = false;
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   applicationName: "Careerotic",
@@ -18,9 +23,6 @@ export const metadata: Metadata = {
 };
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#4338ca" };
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  // Supabase auth reads request-bound session state and the shared shell/footer
-  // also contain request-time values. Keep the entire route tree out of static
-  // prerendering so Next.js does not evaluate auth state while prerendering.
   await connection();
 
   return (
