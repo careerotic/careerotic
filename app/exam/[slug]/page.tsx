@@ -1,10 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 type Props = { params: Promise<{ slug: string }> };
 
-export async function generateMetadata({ params }: Props) {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const supabase = await createClient();
   const { data } = await supabase
@@ -14,9 +15,20 @@ export async function generateMetadata({ params }: Props) {
     .eq("status", "published")
     .maybeSingle();
 
+  if (!data) {
+    return { title: "Exam not found", robots: { index: false, follow: false } };
+  }
+
+  const title = `${data.title} | Exam details`;
+  const description = data.description?.slice(0, 160) || `Review the published ${data.title} exam details and instructions on Careerotic.`;
+  const canonical = `/exam/${encodeURIComponent(slug)}`;
+
   return {
-    title: data?.title ? `${data.title} | Exam details` : "Exam details",
-    ...(data?.description ? { description: data.description.slice(0, 160) } : {}),
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: { type: "website", url: canonical, title, description },
+    twitter: { card: "summary", title, description },
   };
 }
 
