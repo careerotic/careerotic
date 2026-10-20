@@ -1,11 +1,17 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
+import { connection } from "next/server";
 import { Geist, Geist_Mono } from "next/font/google";
 import AuthAwareAppShell from "@/components/layout/AuthAwareAppShell";
 import "./globals.css";
 const siteUrl = "https://careerotic.vercel.app";
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+
+// Auth/session-dependent pages must wait for the request rather than trying to
+// produce an instant static shell during prerendering.
+export const instant = false;
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   applicationName: "Careerotic",
@@ -16,7 +22,9 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 } },
 };
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#4338ca" };
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  await connection();
+
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full">
