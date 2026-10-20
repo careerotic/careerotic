@@ -9,7 +9,6 @@ import MobileNavigationDrawer from "./MobileNavigationDrawer";
 import RightNavigation from "./RightNavigation";
 
 type Props = { children: React.ReactNode; initialUser: HeaderUser | null };
-
 const authenticationRoutes = ["/login", "/signup", "/forgot-password", "/reset-password"];
 
 export default function AppShell({ children, initialUser }: Props) {
@@ -26,7 +25,7 @@ export default function AppShell({ children, initialUser }: Props) {
     }
   }, [drawerOpen, pathname]);
 
-  // Admin and authentication screens intentionally use their own focused layouts.
+  // Authentication and administration pages keep their focused page layouts.
   if (
     pathname === "/admin" ||
     pathname.startsWith("/admin/") ||
@@ -40,14 +39,14 @@ export default function AppShell({ children, initialUser }: Props) {
     <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900">
       <GlobalHeader initialUser={initialUser} menuOpen={drawerOpen} onMenuClick={toggleMenu} />
       <MobileNavigationDrawer open={drawerOpen} onClose={closeMenu} />
-      <div className="mx-auto w-full max-w-[1440px] flex-1 px-3 sm:px-4 lg:px-4">
+      <div className="app-page-gutter mx-auto flex w-full max-w-[1760px] flex-1 flex-col">
         <Breadcrumbs />
-        <div className="grid min-w-0 grid-cols-1 gap-3 pb-5 lg:grid-cols-[11rem_minmax(0,1fr)] xl:grid-cols-[11rem_minmax(0,1fr)_14rem] xl:gap-3">
-          <aside className="sticky top-[4.5rem] hidden max-h-[calc(100vh-5.25rem)] overflow-y-auto self-start rounded-lg border border-slate-200 bg-white p-2 lg:block">
+        <div className="app-layout-gap grid min-w-0 flex-1 grid-cols-1 pb-3 lg:grid-cols-[10rem_minmax(0,1fr)] xl:grid-cols-[10rem_minmax(0,1fr)_13rem]">
+          <aside className="sticky top-[3.5rem] hidden max-h-[calc(100vh-4rem)] self-start overflow-y-auto py-1 pr-1 lg:block">
             <LeftNavigation />
           </aside>
-          <main id="main-content" className="min-w-0">{children}</main>
-          <div className="min-w-0 lg:col-span-2 xl:col-span-1 xl:sticky xl:top-[4.5rem] xl:self-start">
+          <main id="main-content" className="min-w-0 py-1">{children}</main>
+          <div className="min-w-0 lg:col-span-2 xl:col-span-1 xl:sticky xl:top-[3.5rem] xl:max-h-[calc(100vh-4rem)] xl:self-start xl:overflow-y-auto xl:py-1">
             <RightNavigation />
           </div>
         </div>
