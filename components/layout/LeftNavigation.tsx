@@ -43,32 +43,29 @@ export default function LeftNavigation({ onNavigate, id }: Props) {
       if (event === "SIGNED_OUT" || !session?.user) setIsAdmin(false);
       else setIsAdmin(session.user.app_metadata?.role === "admin");
     });
-    return () => {
-      active = false;
-      subscription.unsubscribe();
-    };
+    return () => { active = false; subscription.unsubscribe(); };
   }, []);
 
   return (
-    <nav id={id} aria-label="Primary navigation" className="space-y-0.5">
-      <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Explore Careerotic</p>
+    <nav id={id} aria-label="Primary navigation" className="space-y-px">
+      <p className="mb-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Explore</p>
       {links.map((link) => {
         const active = link.href === "/" ? pathname === "/" : pathname === link.href || pathname.startsWith(link.href + "/");
         return (
           <Link key={link.href} href={link.href} onClick={onNavigate} aria-current={active ? "page" : undefined}
-            className={`flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 ${active ? "bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-100" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}>
-            <span aria-hidden="true" className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-current/15 text-xs">{link.icon}</span>
-            <span>{link.label}</span>
-            {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-600" aria-hidden="true" />}
+            className={`flex min-h-8 items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 ${active ? "bg-indigo-50 text-indigo-800" : "text-slate-600 hover:bg-white hover:text-slate-900"}`}>
+            <span aria-hidden="true" className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[11px] ${active ? "bg-white text-indigo-700" : "text-slate-400"}`}>{link.icon}</span>
+            <span className="min-w-0 flex-1">{link.label}</span>
+            {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-600" aria-hidden="true" />}
           </Link>
         );
       })}
       {isAdmin && (
-        <div className="mt-3 border-t border-slate-100 pt-2">
-          <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Administration</p>
+        <div className="mt-2 border-t border-slate-200/70 pt-2">
+          <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Administration</p>
           <Link href="/admin" onClick={onNavigate} aria-current={pathname === "/admin" || pathname.startsWith("/admin/") ? "page" : undefined}
-            className={`flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 ${pathname === "/admin" || pathname.startsWith("/admin/") ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}>
-            <span aria-hidden="true" className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-current/15 text-xs">⚙</span>
+            className={`flex min-h-8 items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 ${pathname === "/admin" || pathname.startsWith("/admin/") ? "bg-indigo-50 text-indigo-800" : "text-slate-600 hover:bg-white hover:text-slate-900"}`}>
+            <span aria-hidden="true" className="inline-flex h-5 w-5 items-center justify-center text-xs">⚙</span>
             Admin panel
           </Link>
         </div>
