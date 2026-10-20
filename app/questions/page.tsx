@@ -35,6 +35,7 @@ export default async function QuestionsPage({ searchParams }: PageProps) {
     .select("id,topic_id,prompt,language,created_at,topics!inner(id,name,subject_id,subjects!inner(id,name)),question_options(id,question_id,option_text,option_order)", { count: "exact" })
     .eq("status", "published")
     .order("created_at", { ascending: false })
+    .order("id", { ascending: true })
     .range(from, from + PAGE_SIZE - 1);
 
   if (!error && page > 1 && (count === 0 || (count !== null && from >= count))) notFound();

@@ -121,7 +121,7 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     if (topicId !== "all") query = query.eq("topic_id", topicId);
     if (language !== "all") query = query.eq("language", language);
     if (search) query = query.ilike("prompt", `%${search.replace(/[%_]/g, "\\$&")}%`);
-    query = query.order("created_at", { ascending: sort === "oldest" }).range(from, to);
+    query = query.order("created_at", { ascending: sort === "oldest" }).order("id", { ascending: true }).range(from, to);
     const { data, error: queryError, count } = await query;
     if (queryError) {
       setError(queryError.message);
