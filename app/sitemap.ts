@@ -35,7 +35,19 @@ function uniqueSameOriginRoutes(routes: MetadataRoute.Sitemap): MetadataRoute.Si
   for (const route of routes) {
     try {
       const url = new URL(route.url);
-      if (url.origin !== siteUrl || url.search || url.hash) continue;
+      if (url.origin !== siteUrl || url.hash) continue;
+      if (url.search) {
+        const pageValues = url.searchParams.getAll("page");
+        const page = Number(pageValues[0]);
+        if (
+          url.pathname !== "/questions" ||
+          url.searchParams.size !== 1 ||
+          pageValues.length !== 1 ||
+          !Number.isSafeInteger(page) ||
+          page < 2 ||
+          String(page) !== pageValues[0]
+        ) continue;
+      }
       unique.set(url.toString(), { ...route, url: url.toString() });
     } catch {
       // Skip malformed URLs instead of emitting an invalid sitemap entry.
@@ -130,7 +142,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }];
     });
 
-    return uniqueSameOriginRoutes([...staticRoutes, ...subjectRoutes, ...topicRoutes, ...examRoutes]);
+    const totalQuestionPages = Math.ceil(questionRows.length / 25);
+    const questionPageRoutes: MetadataRoute.Sitemap = Array.from(
+      { length: Math.max(0, totalQuestionPages - 1) },
+      (_, index) => {
+        const page = index + 2;
+        return {
+          url: new URL(`/questions?page=${page}`, siteUrl).toString(),
+          changeFrequency: "daily" as const,
+          priority: 0.8,
+        };
+      },
+    );
+
+    return uniqueSameOriginRoutes([
+      ...staticRoutes,
+      ...questionPageRoutes,
+      ...subjectRoutes,
+      ...topicRoutes,
+      ...examRoutes,
+    ]);
   } catch {
     return uniqueSameOriginRoutes(staticRoutes);
   }
