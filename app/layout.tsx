@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
+import { connection } from "next/server";
 import { Geist, Geist_Mono } from "next/font/google";
 import AuthAwareAppShell from "@/components/layout/AuthAwareAppShell";
 import "./globals.css";
@@ -16,7 +17,12 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 } },
 };
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#4338ca" };
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Supabase auth reads request-bound session state and the shared shell/footer
+  // also contain request-time values. Keep the entire route tree out of static
+  // prerendering so Next.js does not evaluate auth state while prerendering.
+  await connection();
+
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full">
