@@ -1,14 +1,18 @@
 "use client";
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+
 type Subject = { id: string; name: string; slug: string };
+
 export default function RightNavigation() {
   const pathname = usePathname();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+
   useEffect(() => {
     let active = true;
     async function loadSubjects() {
@@ -26,27 +30,38 @@ export default function RightNavigation() {
     void loadSubjects();
     return () => { active = false; };
   }, []);
+
   return (
     <aside aria-label="Browse learning content" className="min-w-0">
-      <section className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <div className="border-b border-slate-100 px-3 py-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-indigo-700">Question bank</p>
-          <h2 className="mt-0.5 text-sm font-bold text-slate-900">Browse subjects</h2>
+      <section className="app-panel overflow-hidden">
+        <div className="app-panel-heading">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-indigo-700">Question bank</p>
+          <h2 className="mt-0.5 text-sm font-semibold text-slate-900">Browse subjects</h2>
         </div>
-        <nav aria-label="Subjects" className="max-h-[min(48vh,28rem)] overflow-y-auto p-1.5">
-          {loading ? <div className="space-y-1.5 p-1.5" role="status" aria-label="Loading subjects">{[1, 2, 3].map((item) => <div key={item} className="h-8 animate-pulse rounded-md bg-slate-100" />)}</div>
-          : loadError ? <p role="status" className="px-2 py-3 text-xs text-rose-700">{loadError}</p>
-          : subjects.length === 0 ? <p className="px-2 py-3 text-xs text-slate-500">No subjects available yet.</p>
-          : subjects.map((subject) => {
+        <nav aria-label="Subjects" className="max-h-[min(58vh,38rem)] overflow-y-auto p-1">
+          {loading ? (
+            <div className="space-y-1 p-1" role="status" aria-label="Loading subjects">
+              {[1, 2, 3].map((item) => <div key={item} className="h-7 animate-pulse rounded bg-slate-100" />)}
+            </div>
+          ) : loadError ? (
+            <p role="status" className="px-2 py-3 text-xs text-rose-700">{loadError}</p>
+          ) : subjects.length === 0 ? (
+            <p className="px-2 py-3 text-xs text-slate-500">No subjects available yet.</p>
+          ) : subjects.map((subject) => {
             const href = `/subjects/${subject.slug}`;
             const current = pathname === href || pathname.startsWith(href + "/");
-            return <Link key={subject.id} href={href} aria-current={current ? "page" : undefined} className={`group flex min-w-0 items-center gap-2 rounded-lg px-2 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 ${current ? "bg-indigo-50 font-semibold text-indigo-800" : "text-slate-700 hover:bg-slate-50 hover:text-indigo-800"}`}>
-              <span aria-hidden="true" className={`grid h-6 w-6 shrink-0 place-items-center rounded-md text-[10px] font-bold ${current ? "bg-white text-indigo-700" : "bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-indigo-700"}`}>•</span>
-              <span className="min-w-0 flex-1 break-words leading-5">{subject.name}</span><span aria-hidden="true" className="text-slate-300 group-hover:text-indigo-500">›</span>
-            </Link>;
+            return (
+              <Link key={subject.id} href={href} aria-current={current ? "page" : undefined}
+                className={`group flex min-w-0 items-center gap-1.5 rounded px-2 py-1.5 text-[13px] leading-5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 ${current ? "bg-indigo-50 font-semibold text-indigo-800" : "text-slate-600 hover:bg-slate-50 hover:text-indigo-800"}`}>
+                <span aria-hidden="true" className={`shrink-0 text-xs ${current ? "text-indigo-600" : "text-slate-300 group-hover:text-indigo-500"}`}>•</span>
+                <span className="min-w-0 flex-1 break-words">{subject.name}</span>
+              </Link>
+            );
           })}
         </nav>
-        <div className="border-t border-slate-100 p-1.5"><Link href="/questions" className="block rounded-lg px-2.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">View all questions →</Link></div>
+        <div className="border-t border-slate-200/70 p-1">
+          <Link href="/questions" className="block rounded px-2 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">View all questions →</Link>
+        </div>
       </section>
     </aside>
   );
