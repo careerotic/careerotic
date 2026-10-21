@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { connection } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getCachedPublicTaxonomy } from "@/lib/cache/public-data";
 
 export const metadata: Metadata = {
   title: "Browse subjects",
@@ -12,14 +11,9 @@ export const metadata: Metadata = {
 type Subject = { id: string; name: string; slug: string };
 
 export default async function SubjectsPage() {
-  await connection();
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("subjects")
-    .select("id,name,slug")
-    .order("name", { ascending: true });
-
-  const subjects = (data ?? []) as Subject[];
+  let subjects: Subject[] = [];
+  let error = false;
+  try { subjects = (await getCachedPublicTaxonomy()).subjects as Subject[]; } catch { error = true; }
 
   return (
     <section className="space-y-4 pb-4">
