@@ -14,7 +14,7 @@ type QuestionRow = {
   prompt: string;
   language: string;
   created_at: string;
-  question_options: { id: string; option_text: string; option_order: number }[] | null;
+  question_options: { id: string; option_text: string; option_order: number }[];
 };
 
 export async function generateMetadata({ params }: RouteProps): Promise<Metadata> {
@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: RouteProps): Promise<Metadata
   const cached = await getCachedSubjectPageData(subjectSlug);
   const subject = cached.subject;
   if (!subject) return { title: "Topic questions" };
-  const topic = cached.topics.find((item) => item.slug === topicSlug);
+  const topic = (cached.topics as { id: string; name: string; slug: string }[]).find((item) => item.slug === topicSlug);
   return {
     title: topic?.name ? `${topic.name} questions` : "Topic questions",
     description: topic?.name ? `Practise published ${topic.name} questions in ${subject.name} on Careerotic.` : "Practise questions from the Careerotic question bank.",
@@ -40,9 +40,9 @@ export default async function TopicPage({ params, searchParams }: RouteProps) {
   let total = 0;
   try {
     const cached = await getCachedTopicPageData(subjectSlug, topicSlug, page, PAGE_SIZE);
-    subject = cached.subject as typeof subject;
-    topic = cached.topic as typeof topic;
-    questions = cached.questions as QuestionRow[];
+    subject = cached.subject as { id: string; name: string; slug: string } | null;
+    topic = cached.topic as { id: string; name: string; slug: string; subject_id: string } | null;
+    questions = cached.questions as unknown as QuestionRow[];
     total = cached.total;
   } catch (error) {
     console.error("Topic page cache lookup failed:", error);
