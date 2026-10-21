@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedHomePublicData } from "@/lib/cache/public-data";
 
 const primaryButton =
   "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md bg-indigo-700 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1";
@@ -32,29 +33,14 @@ type FeaturedQuestion = {
 
 export default async function Home() {
   const supabase = await createClient();
-  const [
-    { data: userResult },
-    { count: questionCount, error: questionCountError },
-    { count: subjectCount, error: subjectCountError },
-    { data: exams, count: examCount, error: examError },
-    { data: featuredQuestionRows, error: featuredQuestionError },
-  ] = await Promise.all([
+  const [{ data: userResult }, publicData] = await Promise.all([
     supabase.auth.getUser(),
-    supabase.from("questions").select("id", { count: "exact", head: true }).eq("status", "published"),
-    supabase.from("subjects").select("id", { count: "exact", head: true }),
-    supabase
-      .from("exams")
-      .select("id,title,slug,description,duration_minutes,category_id,exam_categories(name)", { count: "exact" })
-      .eq("status", "published")
-      .order("start_at", { ascending: true, nullsFirst: false })
-      .limit(3),
-    supabase
-      .from("questions")
-      .select("id,prompt,language,topics!inner(name,subjects!inner(name)),question_options(id,option_text,option_order)")
-      .eq("status", "published")
-      .order("created_at", { ascending: false })
-      .limit(1),
+    getCachedHomePublicData(),
   ]);
+  const {
+    questionCount, questionCountError, subjectCount, subjectCountError,
+    exams, examCount, examError, featuredQuestionRows, featuredQuestionError,
+  } = publicData;
 
   const user = userResult.user;
   const displayName =

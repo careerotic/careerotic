@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 type Subject = { id: string; name: string; slug: string };
@@ -18,10 +17,10 @@ export default function RightNavigation() {
     let active = true;
     async function loadSubjects() {
       try {
-        const supabase = createClient();
-        const { data, error } = await supabase.from("subjects").select("id,name,slug").order("name", { ascending: true });
-        if (error) throw error;
-        if (active) setSubjects((data ?? []) as Subject[]);
+        const response = await fetch("/api/public/taxonomy");
+        if (!response.ok) throw new Error("Subjects could not be loaded.");
+        const payload = await response.json() as { subjects: Subject[] };
+        if (active) setSubjects(payload.subjects ?? []);
       } catch {
         if (active) setLoadError("Subjects could not be loaded.");
       } finally {
