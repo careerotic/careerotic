@@ -161,7 +161,6 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
   useEffect(() => {
     const client = supabase;
     if (!client || questions.length === 0) return;
-    const db = client as NonNullable<typeof client>;
     let active = true;
     async function preloadAnswers() {
       const missing = questions.filter((question) => !answers[question.id]);
