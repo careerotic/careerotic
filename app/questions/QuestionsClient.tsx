@@ -74,7 +74,6 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setSearch(searchInput.trim());
-      setPage(1);
     }, 250);
     return () => window.clearTimeout(timer);
   }, [searchInput]);
@@ -189,8 +188,7 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     return () => { active = false; };
   }, [questions, supabase]);
 
-  useEffect(() => { setTopicId("all"); setPage(1); }, [subjectId]);
-  useEffect(() => { setPage(1); }, [topicId, language, sort]);
+  // Reset pagination in filter handlers, not on mount, so URL page=N survives initial render.
 
   async function toggleBookmark(question: Question) {
     if (!supabase) { setNotice("Supabase is not configured for this deployment."); return; }
@@ -265,13 +263,13 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
           <label className="relative block">
             <span className="sr-only">Search questions</span>
             <svg viewBox="0 0 24 24" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 4 4" strokeLinecap="round" /></svg>
-            <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search questions..." className={`${inputClass} pl-9`} />
+            <input value={searchInput} onChange={(event) => { setSearchInput(event.target.value); setPage(1); }} placeholder="Search questions..." className={`${inputClass} pl-9`} />
           </label>
           <div className={`${mobileFiltersOpen ? "grid" : "hidden"} grid-cols-1 gap-2 sm:grid-cols-2 md:grid md:grid-cols-4`}>
-            <label className="space-y-1"><span className="text-xs font-medium text-slate-600">Subject</span><select value={subjectId} onChange={(event) => setSubjectId(event.target.value)} className={inputClass}><option value="all">All subjects</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
-            <label className="space-y-1"><span className="text-xs font-medium text-slate-600">Topic</span><select value={topicId} onChange={(event) => setTopicId(event.target.value)} className={inputClass}><option value="all">All topics</option>{availableTopics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select></label>
-            <label className="space-y-1"><span className="text-xs font-medium text-slate-600">Language</span><select value={language} onChange={(event) => setLanguage(event.target.value)} className={inputClass}><option value="all">All languages</option><option value="bn">বাংলা</option><option value="en">English</option></select></label>
-            <label className="space-y-1"><span className="text-xs font-medium text-slate-600">Sort</span><select value={sort} onChange={(event) => setSort(event.target.value)} className={inputClass}><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label>
+            <label className="space-y-1"><span className="text-xs font-medium text-slate-600">Subject</span><select value={subjectId} onChange={(event) => { setSubjectId(event.target.value); setTopicId("all"); setPage(1); }} className={inputClass}><option value="all">All subjects</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
+            <label className="space-y-1"><span className="text-xs font-medium text-slate-600">Topic</span><select value={topicId} onChange={(event) => { setTopicId(event.target.value); setPage(1); }} className={inputClass}><option value="all">All topics</option>{availableTopics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select></label>
+            <label className="space-y-1"><span className="text-xs font-medium text-slate-600">Language</span><select value={language} onChange={(event) => { setLanguage(event.target.value); setPage(1); }} className={inputClass}><option value="all">All languages</option><option value="bn">বাংলা</option><option value="en">English</option></select></label>
+            <label className="space-y-1"><span className="text-xs font-medium text-slate-600">Sort</span><select value={sort} onChange={(event) => { setSort(event.target.value); setPage(1); }} className={inputClass}><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label>
           </div>
         </div>
 
