@@ -1,30 +1,85 @@
+import Image from "next/image";
 import Link from "next/link";
 
 const footerGroups = [
-  { title: "Explore", links: [{ href: "/", label: "Home" }, { href: "/questions", label: "Question bank" }, { href: "/exams", label: "Published exams" }, { href: "/exam-categories", label: "Exam categories" }, { href: "/subjects", label: "Subjects" }, { href: "/study-guides", label: "Study guides" }, { href: "/current-affairs", label: "Current affairs" }, { href: "/help", label: "Help & FAQ" }, { href: "/search", label: "Search" }] },
-  { title: "Policies", links: [{ href: "/privacy", label: "Privacy policy" }, { href: "/terms", label: "Terms of use" }] },
+  {
+    title: "Practice",
+    links: [
+      { href: "/questions", label: "Question bank" },
+      { href: "/exams", label: "Published exams" },
+      { href: "/exam-categories", label: "Exam categories" },
+      { href: "/subjects", label: "Browse subjects" },
+    ],
+  },
+  {
+    title: "Learning",
+    links: [
+      { href: "/study-guides", label: "Study guides" },
+      { href: "/current-affairs", label: "Current affairs" },
+      { href: "/study-plan", label: "Study plan" },
+      { href: "/search", label: "Search Careerotic" },
+    ],
+  },
+  {
+    title: "Support",
+    links: [
+      { href: "/help", label: "Help & FAQ" },
+      { href: "/privacy", label: "Privacy policy" },
+      { href: "/terms", label: "Terms of use" },
+    ],
+  },
 ];
 
 export default function GlobalFooter() {
   return (
-    <footer className="mt-auto border-t border-slate-200/80 bg-white">
-      <div className="app-page-gutter mx-auto grid w-full max-w-[1760px] grid-cols-1 gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-        <div className="min-w-0">
-          <Link href="/" className="inline-flex items-center gap-1.5 rounded font-bold tracking-tight text-slate-900 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
-            <span aria-hidden="true" className="grid h-6 w-6 place-items-center rounded bg-indigo-700 text-[10px] font-black text-white">C</span>Careerotic
-          </Link>
-          <p className="mt-1 text-xs leading-4 text-slate-500">Practise questions, review explanations, and prepare for published exams.</p>
-          <p className="mt-1.5 text-[11px] text-slate-400">© {new Date().getFullYear()} Careerotic. All rights reserved.</p>
-        </div>
-        <div className="flex flex-wrap gap-x-6 gap-y-2 sm:justify-end">
+    <footer className="mt-auto border-t border-slate-200 bg-white">
+      <div className="h-1 w-full bg-gradient-to-r from-slate-900 via-blue-600 to-sky-400" aria-hidden="true" />
+      <div className="app-page-gutter mx-auto w-full max-w-[1760px] py-7 sm:py-9">
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))] lg:gap-10">
+          <div className="min-w-0">
+            <Link
+              href="/"
+              aria-label="Careerotic home"
+              className="inline-flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+            >
+              <Image src="/brand/careerotic-mark.svg" alt="" width={36} height={36} className="h-9 w-9" />
+              <span className="text-xl font-extrabold tracking-tight text-slate-900">
+                Career<span className="text-blue-600">otic</span>
+              </span>
+            </Link>
+            <p className="mt-3 max-w-sm text-sm leading-6 text-slate-600">
+              Build confidence for competitive exams with subject-wise practice, clear explanations, and published exam preparation.
+            </p>
+            <Link
+              href="/questions"
+              className="mt-4 inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+            >
+              Start practising <span className="ml-2" aria-hidden="true">→</span>
+            </Link>
+          </div>
+
           {footerGroups.map((group) => (
             <nav key={group.title} aria-label={group.title}>
-              <h2 className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">{group.title}</h2>
-              <ul className="flex flex-wrap gap-x-3 gap-y-1 sm:flex-col sm:gap-1">
-                {group.links.map((link) => <li key={link.href}><Link href={link.href} className="text-xs text-slate-600 transition-colors hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">{link.label}</Link></li>)}
+              <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-slate-900">{group.title}</h2>
+              <ul className="mt-3 space-y-2.5">
+                {group.links.map((link) => (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      className="inline-flex rounded text-sm leading-5 text-slate-600 transition-colors hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
               </ul>
             </nav>
           ))}
+        </div>
+
+        <div className="mt-8 flex flex-col gap-2 border-t border-slate-200 pt-4 text-xs leading-5 text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <p>© {new Date().getFullYear()} Careerotic. All rights reserved.</p>
+          <p>Practice regularly. Learn with confidence.</p>
         </div>
       </div>
     </footer>
