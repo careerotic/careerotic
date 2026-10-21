@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import QuestionBankCard from "@/components/questions/QuestionBankCard";
 
 type Option = { id: string; option_text: string; option_order: number };
@@ -42,10 +41,10 @@ export default function TopicQuestionList({ questions }: { questions: Question[]
     setLoadingId(question.id);
     setErrors((current) => ({ ...current, [question.id]: "" }));
     try {
-      const supabase = createClient();
-      const { data, error } = await supabase.rpc("get_published_question_answer", { p_question_id: question.id });
-      if (error) throw error;
-      const answer = parseAnswer(data);
+      const response = await fetch(`/api/questions/answers?ids=${encodeURIComponent(question.id)}`);
+      if (!response.ok) throw new Error("Could not load the answer. Please try again.");
+      const payload = await response.json() as { answers?: Record<string, unknown> };
+      const answer = parseAnswer(payload.answers?.[question.id]);
       if (!answer?.correct_option) throw new Error("The answer is not available for this question.");
       setAnswers((current) => ({ ...current, [question.id]: answer }));
       setOpened((current) => ({ ...current, [question.id]: true }));
