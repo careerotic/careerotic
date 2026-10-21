@@ -19,8 +19,9 @@ const nextConfig: NextConfig = {
   experimental: {
     agentFeedback: true,
   },
-  cacheComponents: true,
-  partialPrefetching: true,
+  // Keep request-time Supabase/session routes on the default renderer. Cache Components
+  // caused production Date.now() prerender errors inside Supabase auth session loading.
+
   turbopack: {
     rules: {
       "*.css": {
