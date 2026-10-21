@@ -19,7 +19,10 @@ export async function GET(request: Request) {
       return null;
     }
   }));
-  const answers = Object.fromEntries(pairs.filter((pair): pair is readonly [string, unknown] => pair !== null));
+  const answers: Record<string, unknown> = {};
+  for (const pair of pairs) {
+    if (pair) answers[pair[0]] = pair[1];
+  }
   return NextResponse.json(
     { answers },
     { headers: { "Cache-Control": "public, s-maxage=120, stale-while-revalidate=240" } },
