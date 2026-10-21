@@ -24,7 +24,7 @@ export default async function SubjectPage({ params }: RouteProps) {
   let questionCountByTopic = new Map<string, number>();
   try {
     const cached = await getCachedSubjectPageData(subjectSlug);
-    subject = cached.subject as typeof subject;
+    subject = cached.subject as { id: string; name: string; slug: string } | null;
     topics = cached.topics as TopicRow[];
     questionCountByTopic = new Map(cached.questionCountByTopic);
   } catch (error) {
