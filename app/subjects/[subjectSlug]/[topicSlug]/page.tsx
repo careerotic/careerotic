@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { connection } from "next/server";
 import TopicQuestionList from "@/components/questions/TopicQuestionList";
-import { createClient } from "@/lib/supabase/server";
+import { getCachedSubjectPageData, getCachedTopicPageData } from "@/lib/cache/public-data";
 
 const PAGE_SIZE = 20;
 type RouteProps = {
@@ -19,12 +18,11 @@ type QuestionRow = {
 };
 
 export async function generateMetadata({ params }: RouteProps): Promise<Metadata> {
-  await connection();
   const { subjectSlug, topicSlug } = await params;
-  const supabase = await createClient();
-  const { data: subject } = await supabase.from("subjects").select("id,name").eq("slug", subjectSlug).maybeSingle();
+  const cached = await getCachedSubjectPageData(subjectSlug);
+  const subject = cached.subject;
   if (!subject) return { title: "Topic questions" };
-  const { data: topic } = await supabase.from("topics").select("name").eq("subject_id", subject.id).eq("slug", topicSlug).maybeSingle();
+  const topic = cached.topics.find((item) => item.slug === topicSlug);
   return {
     title: topic?.name ? `${topic.name} questions` : "Topic questions",
     description: topic?.name ? `Practise published ${topic.name} questions in ${subject.name} on Careerotic.` : "Practise questions from the Careerotic question bank.",
@@ -36,40 +34,23 @@ export default async function TopicPage({ params, searchParams }: RouteProps) {
   const [{ subjectSlug, topicSlug }, query] = await Promise.all([params, searchParams]);
   const requestedPage = Number.parseInt(query.page ?? "1", 10);
   const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
-  const supabase = await createClient();
-
-  const { data: subject, error: subjectError } = await supabase
-    .from("subjects")
-    .select("id,name,slug")
-    .eq("slug", subjectSlug)
-    .maybeSingle();
-  if (subjectError) throw new Error("Unable to load this subject.");
+  let subject: { id: string; name: string; slug: string } | null = null;
+  let topic: { id: string; name: string; slug: string; subject_id: string } | null = null;
+  let questions: QuestionRow[] = [];
+  let total = 0;
+  try {
+    const cached = await getCachedTopicPageData(subjectSlug, topicSlug, page, PAGE_SIZE);
+    subject = cached.subject as typeof subject;
+    topic = cached.topic as typeof topic;
+    questions = cached.questions as QuestionRow[];
+    total = cached.total;
+  } catch (error) {
+    console.error("Topic page cache lookup failed:", error);
+    throw new Error("Unable to load questions for this topic.");
+  }
   if (!subject) notFound();
-
-  const { data: topic, error: topicError } = await supabase
-    .from("topics")
-    .select("id,name,slug,subject_id")
-    .eq("subject_id", subject.id)
-    .eq("slug", topicSlug)
-    .maybeSingle();
-  if (topicError) throw new Error("Unable to load this topic.");
   if (!topic) notFound();
-
   const from = (page - 1) * PAGE_SIZE;
-  const { data: questionRows, error: questionsError, count } = await supabase
-    .from("questions")
-    .select("id,prompt,language,created_at,question_options(id,option_text,option_order)", { count: "exact" })
-    .eq("topic_id", topic.id)
-    .eq("status", "published")
-    .order("created_at", { ascending: false })
-    .range(from, from + PAGE_SIZE - 1);
-
-  if (questionsError) throw new Error("Unable to load questions for this topic.");
-  const questions = ((questionRows ?? []) as unknown as QuestionRow[]).map((question) => ({
-    ...question,
-    question_options: [...(question.question_options ?? [])].sort((a, b) => a.option_order - b.option_order),
-  }));
-  const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const first = total ? from + 1 : 0;
   const last = Math.min(from + questions.length, total);
