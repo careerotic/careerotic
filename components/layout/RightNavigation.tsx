@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 type Subject = { id: string; name: string; slug: string };
 
@@ -41,7 +42,7 @@ export default function RightNavigation() {
         <nav aria-label="Subjects" className="max-h-[min(58vh,38rem)] overflow-y-auto p-1">
           {loading ? (
             <div className="space-y-1 p-1" role="status" aria-label="Loading subjects">
-              {[1, 2, 3].map((item) => <div key={item} className="h-7 animate-pulse rounded bg-slate-100" />)}
+              {[1, 2, 3].map((item) => <Skeleton key={item} className="h-7 rounded bg-slate-100" />)}
             </div>
           ) : loadError ? (
             <p role="status" className="px-2 py-3 text-xs text-rose-700">{loadError}</p>
