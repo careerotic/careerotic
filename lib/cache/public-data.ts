@@ -218,3 +218,28 @@ export const getCachedPublicSearch = unstable_cache(
   ["public-search-v1"],
   { revalidate: 60, tags: ["public-questions", "public-taxonomy", "published-exams"] },
 );
+
+
+export const getCachedQuestionFilterPage = unstable_cache(
+  async (page: number, pageSize: number, subjectId: string, topicId: string, language: string, search: string, sort: string) => {
+    const supabase = createPublicClient();
+    const from = (page - 1) * pageSize;
+    let query = supabase.from("questions")
+      .select(QUESTION_SELECT, { count: "exact" })
+      .eq("status", "published");
+    if (subjectId !== "all") query = query.eq("topics.subject_id", subjectId);
+    if (topicId !== "all") query = query.eq("topic_id", topicId);
+    if (language !== "all") query = query.eq("language", language);
+    if (search) query = query.ilike("prompt", "%" + search.replace(/[%_]/g, "\\$&") + "%");
+    query = query.order("created_at", { ascending: sort === "oldest" }).order("id", { ascending: true }).range(from, from + pageSize - 1);
+    const { data, error, count } = await query;
+    if (error) throw new Error(`Public filtered questions lookup failed: ${error.message}`);
+    const questions = (data ?? []).map((question) => ({
+      ...question,
+      question_options: [...(question.question_options ?? [])].sort((a, b) => a.option_order - b.option_order),
+    }));
+    return { questions, total: count ?? 0 };
+  },
+  ["public-question-filter-page-v1"],
+  { revalidate: 120, tags: ["public-questions", "public-taxonomy"] },
+);
