@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import QuestionBankCard from "@/components/questions/QuestionBankCard";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 type Option = { id: string; question_id: string; option_text: string; option_order: number };
 type Question = {
@@ -280,7 +281,7 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
           <span className="text-slate-500">{loading ? "Loading…" : total === 0 ? "0 questions" : `${firstItem}–${lastItem} of ${total}`}</span>
         </div>
 
-        {loading ? <div className="space-y-3" aria-label="Loading questions">{Array.from({ length: 4 }, (_, index) => <div key={index} className="animate-pulse rounded-lg border border-slate-200 bg-white p-4"><div className="mb-3 h-3 w-40 rounded bg-slate-200" /><div className="mb-4 h-4 w-3/4 rounded bg-slate-200" /><div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{[1, 2, 3, 4].map((item) => <div key={item} className="h-9 rounded bg-slate-100" />)}</div></div>)}</div>
+        {loading ? <div className="space-y-3" role="status" aria-label="Loading questions" aria-busy="true">{Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="rounded-lg border border-slate-200 bg-white p-4"><Skeleton className="mb-3 h-3 w-40 rounded bg-slate-200" /><Skeleton className="mb-4 h-4 w-3/4 rounded bg-slate-200" /><div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{[1, 2, 3, 4].map((item) => <Skeleton key={item} className="h-9 rounded bg-slate-100" />)}</div></Skeleton>)}</div>
           : questions.length === 0 ? <div className="rounded-lg border border-slate-200 bg-white px-4 py-12 text-center"><p className="font-medium text-slate-800">No questions found</p><p className="mt-1 text-sm text-slate-500">Try another search or change your filters.</p></div>
           : <div className="space-y-3">{questions.map((question) => (
               <QuestionBankCard
