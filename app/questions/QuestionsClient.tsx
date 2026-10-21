@@ -113,31 +113,30 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     setLoading(true);
     setError("");
     setNotice("");
-    const from = (page - 1) * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
-    let query = supabase
-      .from("questions")
-      .select("id,topic_id,prompt,language,created_at,topics!inner(id,name,subject_id,subjects!inner(id,name)),question_options(id,question_id,option_text,option_order)", { count: "exact" })
-      .eq("status", "published");
-    if (subjectId !== "all") query = query.eq("topics.subject_id", subjectId);
-    if (topicId !== "all") query = query.eq("topic_id", topicId);
-    if (language !== "all") query = query.eq("language", language);
-    if (search) query = query.ilike("prompt", `%${search.replace(/[%_]/g, "\\$&")}%`);
-    query = query.order("created_at", { ascending: sort === "oldest" }).order("id", { ascending: true }).range(from, to);
-    const { data, error: queryError, count } = await query;
-    if (queryError) {
-      setError(queryError.message);
+    try {
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(PAGE_SIZE),
+        subjectId,
+        topicId,
+        language,
+        search,
+        sort,
+      });
+      const response = await fetch(`/api/public/questions?${params.toString()}`);
+      if (!response.ok) throw new Error("Questions could not be loaded. Please try again.");
+      const result = await response.json() as { questions: Question[]; total: number };
+      const normalized = (result.questions ?? []).map((question) => ({
+        ...question,
+        question_options: [...(question.question_options ?? [])].sort((a, b) => a.option_order - b.option_order),
+      }));
+      setQuestions(normalized);
+      setTotal(result.total ?? 0);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Questions could not be loaded.");
       setQuestions([]);
       setTotal(0);
-      setLoading(false);
-      return;
     }
-    const normalized = ((data ?? []) as unknown as Question[]).map((question) => ({
-      ...question,
-      question_options: [...(question.question_options ?? [])].sort((a, b) => a.option_order - b.option_order),
-    }));
-    setQuestions(normalized);
-    setTotal(count ?? 0);
     setLoading(false);
   }, [supabase, page, subjectId, topicId, language, search, sort]);
 

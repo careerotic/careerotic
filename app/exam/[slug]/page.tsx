@@ -1,19 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getCachedPublishedExamDetail } from "@/lib/cache/public-data";
 
 type Props = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("exams")
-    .select("title,description")
-    .eq("slug", slug)
-    .eq("status", "published")
-    .maybeSingle();
+  const { exam: data } = await getCachedPublishedExamDetail(slug);
 
   if (!data) {
     return { title: "Exam not found", robots: { index: false, follow: false } };
@@ -34,25 +28,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ExamDetailsPage({ params }: Props) {
   const { slug } = await params;
-  const supabase = await createClient();
-  const { data: exam, error } = await supabase
-    .from("exams")
-    .select("id,title,slug,description,duration_minutes,correct_marks,negative_marks,start_at,end_at,exam_categories(name)")
-    .eq("slug", slug)
-    .eq("status", "published")
-    .maybeSingle();
-  if (error) throw new Error("Unable to load this exam.");
+  const { exam, questionCount } = await getCachedPublishedExamDetail(slug);
   if (!exam) notFound();
-
-  const { count, error: countError } = await supabase
-    .from("exam_questions")
-    .select("id", { count: "exact", head: true })
-    .eq("exam_id", exam.id);
   const now = Date.now();
   const start = exam.start_at ? new Date(exam.start_at).getTime() : null;
   const end = exam.end_at ? new Date(exam.end_at).getTime() : null;
   const scheduled = (start === null || now >= start) && (end === null || now < end);
-  const questionCount = countError ? null : count ?? 0;
   const canStart = scheduled && questionCount !== null && questionCount > 0;
 
   const metrics = [
