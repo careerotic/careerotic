@@ -8,10 +8,6 @@ const siteUrl = "https://careerotic.vercel.app";
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
-// Auth/session-dependent pages must wait for the request rather than trying to
-// produce an instant static shell during prerendering.
-export const instant = false;
-
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   applicationName: "Careerotic",
