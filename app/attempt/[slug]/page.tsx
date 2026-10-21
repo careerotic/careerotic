@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 type Option = { id?: string; option_id?: string; text?: string; option_text?: string; option_order?: number };
 type Question = { question_id?: string; id?: string; prompt?: string; question_text?: string; options?: Option[]; selected_option_id?: string | null; question_order?: number };
@@ -168,16 +169,16 @@ export default function ExamAttemptPage() {
   if (loading) return (
     <main className="mx-auto w-full min-w-0 max-w-5xl overflow-x-clip px-2 py-3 sm:px-4 sm:py-4" aria-busy="true" aria-live="polite">
       <div className="sticky top-0 z-20 mb-3 min-w-0 border-b border-slate-200 bg-white/95 px-1 py-3 sm:px-2">
-        <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
-        <div className="mt-3 h-2 w-full animate-pulse rounded bg-slate-100" />
+        <Skeleton className="h-4 w-40 rounded bg-slate-200" />
+        <Skeleton className="mt-3 h-2 w-full rounded bg-slate-100" />
       </div>
       <p className="mb-4 text-sm text-slate-600">Restoring your saved exam answers…</p>
       <div className="space-y-3">
         {Array.from({ length: 3 }, (_, index) => (
           <section key={index} className="rounded-lg border border-slate-200 p-3 sm:p-4">
-            <div className="mb-4 h-4 w-3/4 animate-pulse rounded bg-slate-200" />
+            <Skeleton className="mb-4 h-4 w-3/4 rounded bg-slate-200" />
             <div className="grid gap-2 sm:grid-cols-2">
-              <div className="h-10 animate-pulse rounded-md bg-slate-100" />
+              <Skeleton className="h-10 rounded-md bg-slate-100" />
               <div className="h-10 animate-pulse rounded-md bg-slate-100" />
             </div>
           </section>
