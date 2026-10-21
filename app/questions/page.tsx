@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getCachedQuestionBankPage } from "@/lib/cache/public-data";
 import QuestionsClient from "./QuestionsClient";
 
 const PAGE_SIZE = 25;
@@ -29,21 +29,27 @@ export default async function QuestionsPage({ searchParams }: PageProps) {
   const page = parsePage(requestedPage);
   if (page === 1 && requestedPage !== undefined) redirect("/questions");
   const from = (page - 1) * PAGE_SIZE;
-  const supabase = await createClient();
-  const { data, error, count } = await supabase
-    .from("questions")
-    .select("id,topic_id,prompt,language,created_at,topics!inner(id,name,subject_id,subjects!inner(id,name)),question_options(id,question_id,option_text,option_order)", { count: "exact" })
-    .eq("status", "published")
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: true })
-    .range(from, from + PAGE_SIZE - 1);
+  let initialQuestions: Awaited<ReturnType<typeof getCachedQuestionBankPage>>["questions"] = [];
+  let initialTotal = 0;
+  let initialLoadFailed = false;
 
-  if (!error && page > 1 && (count === 0 || (count !== null && from >= count))) notFound();
+  try {
+    const cachedPage = await getCachedQuestionBankPage(page, PAGE_SIZE);
+    initialQuestions = cachedPage.questions;
+    initialTotal = cachedPage.total;
+  } catch (error) {
+    console.error("Question bank lookup failed:", error);
+    initialLoadFailed = true;
+  }
 
-  const initialQuestions = (data ?? []).map((question) => ({
-    ...question,
-    question_options: [...(question.question_options ?? [])].sort((a, b) => a.option_order - b.option_order),
-  }));
+  if (!initialLoadFailed && page > 1 && (initialTotal === 0 || from >= initialTotal)) notFound();
 
-  return <QuestionsClient initialQuestions={initialQuestions as never[]} initialLoadFailed={Boolean(error)} initialPage={page} initialTotal={count ?? 0} />;
+  return (
+    <QuestionsClient
+      initialQuestions={initialQuestions as never[]}
+      initialLoadFailed={initialLoadFailed}
+      initialPage={page}
+      initialTotal={initialTotal}
+    />
+  );
 }
