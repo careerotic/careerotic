@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import QuestionBankCard from "@/components/questions/QuestionBankCard";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -40,6 +40,7 @@ function answerFromJson(value: unknown): Answer | null {
 
 export default function QuestionsClient({ initialQuestions, initialLoadFailed = false, initialPage = 1, initialTotal = 0 }: { initialQuestions: Question[]; initialLoadFailed?: boolean; initialPage?: number; initialTotal?: number }) {
   const [supabase, setSupabase] = useState<ReturnType<typeof createClient> | null>(null);
+  const skipInitialQuestionFetch = useRef(true);
 
   useEffect(() => {
     try {
@@ -82,20 +83,21 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
   useEffect(() => {
     const client = supabase;
     if (!client) return;
-    const db = client as NonNullable<typeof client>;
     let active = true;
     async function loadTaxonomy() {
-      const [{ data: subjectRows, error: subjectError }, { data: topicRows, error: topicError }] = await Promise.all([
-        db.from("subjects").select("id,name").order("name"),
-        db.from("topics").select("id,name,subject_id").order("name"),
-      ]);
-      if (!active) return;
-      if (subjectError || topicError) {
-        setError(subjectError?.message ?? topicError?.message ?? "Unable to load filters.");
-        return;
+      try {
+        const response = await fetch("/api/public/taxonomy");
+        if (!response.ok) throw new Error("Unable to load filters.");
+        const payload = await response.json() as {
+          subjects: { id: string; name: string; slug: string }[];
+          topics: { id: string; name: string; subject_id: string }[];
+        };
+        if (!active) return;
+        setSubjects(payload.subjects.map(({ id, name }) => ({ id, name })));
+        setTopics(payload.topics);
+      } catch {
+        if (active) setError("Unable to load filters.");
       }
-      setSubjects(subjectRows ?? []);
-      setTopics(topicRows ?? []);
     }
     void loadTaxonomy();
     return () => { active = false; };
@@ -139,7 +141,22 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     setLoading(false);
   }, [supabase, page, subjectId, topicId, language, search, sort]);
 
-  useEffect(() => { void loadQuestions(); }, [loadQuestions]);
+  useEffect(() => {
+    if (!supabase) return;
+    if (skipInitialQuestionFetch.current) {
+      skipInitialQuestionFetch.current = false;
+      if (
+        !initialLoadFailed &&
+        page === initialPage &&
+        subjectId === "all" &&
+        topicId === "all" &&
+        language === "all" &&
+        search === "" &&
+        sort === "newest"
+      ) return;
+    }
+    void loadQuestions();
+  }, [loadQuestions, supabase, initialLoadFailed, initialPage, page, subjectId, topicId, language, search, sort]);
 
   useEffect(() => {
     const client = supabase;
@@ -150,12 +167,18 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
       const missing = questions.filter((question) => !answers[question.id]);
       for (let index = 0; index < missing.length; index += 5) {
         const batch = missing.slice(index, index + 5);
-        const results = await Promise.all(batch.map(async (question) => {
-          const { data, error: rpcError } = await db.rpc("get_published_question_answer", { p_question_id: question.id });
-          if (rpcError) return null;
-          const parsed = answerFromJson(data);
+        let payload: { answers?: Record<string, unknown> } | null = null;
+        try {
+          const response = await fetch(`/api/questions/answers?ids=${encodeURIComponent(batch.map((question) => question.id).join(","))}`);
+          if (response.ok) payload = await response.json() as { answers?: Record<string, unknown> };
+        } catch {
+          // A failed preload must not interrupt browsing.
+        }
+        const results = batch.map((question) => {
+          const parsed = answerFromJson(payload?.answers?.[question.id]);
           return parsed ? [question.id, parsed] as const : null;
-        }));
+        });
+        if (results.every((result) => result === null)) continue;
         if (!active) return;
         setAnswers((current) => {
           const next = { ...current };
