@@ -86,16 +86,17 @@ export default async function Home() {
 
   // Personal analytics are calculated only from the signed-in user's own submitted attempts.
   // RLS on exam_attempts and related tables remains the access-control boundary.
-  const { data: attemptRows, error: attemptError } = user
+  const { data: attemptRows, error: attemptError, count: attemptCount } = user
     ? await supabase
         .from("exam_attempts")
-        .select("id,submitted_at,result_snapshot,exams(title)")
+        .select("id,submitted_at,result_snapshot,exams(title)", { count: "exact" })
         .eq("user_id", user.id)
         .eq("status", "submitted")
         .order("submitted_at", { ascending: false })
         .limit(20)
     : { data: [], error: null };
   const userAttempts = attemptError ? [] : ((attemptRows ?? []) as unknown as UserAttempt[]);
+  const submittedAttemptCount = attemptError ? 0 : (typeof attemptCount === "number" ? attemptCount : userAttempts.length);
   const attemptQuestions = userAttempts.flatMap((attempt) =>
     Array.isArray(attempt.result_snapshot?.questions)
       ? attempt.result_snapshot.questions.filter((question) => typeof question.selected_is_correct === "boolean")
@@ -216,8 +217,8 @@ export default async function Home() {
             </article>
             <article className="rounded-lg border border-slate-200 bg-white p-3">
               <p className="text-xs text-slate-500">সম্পন্ন পরীক্ষা</p>
-              <p className="mt-1 text-2xl font-bold tabular-nums text-slate-950">{userAttempts.length}</p>
-              <p className="mt-1 text-[11px] text-slate-500">সর্বশেষ ২০টি জমা দেওয়া পরীক্ষা</p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-slate-950">{submittedAttemptCount}</p>
+              <p className="mt-1 text-[11px] text-slate-500">মোট জমা দেওয়া পরীক্ষা</p>
             </article>
             <article className="col-span-2 rounded-lg border border-slate-200 bg-white p-3 sm:col-span-1">
               <p className="text-xs text-slate-500">সর্বশেষ পরীক্ষার স্কোর</p>
