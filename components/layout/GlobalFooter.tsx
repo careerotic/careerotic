@@ -50,12 +50,6 @@ export default function GlobalFooter() {
             <p className="mt-3 max-w-sm text-sm leading-6 text-slate-600">
               Build confidence for competitive exams with subject-wise practice, clear explanations, and published exam preparation.
             </p>
-            <Link
-              href="/questions"
-              className="mt-4 inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
-            >
-              Start practising <span className="ml-2" aria-hidden="true">→</span>
-            </Link>
           </div>
 
           {footerGroups.map((group) => (
