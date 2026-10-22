@@ -94,7 +94,7 @@ export default async function Home() {
         .eq("status", "submitted")
         .order("submitted_at", { ascending: false })
         .limit(20)
-    : { data: [], error: null };
+    : { data: [], error: null, count: null };
   const userAttempts = attemptError ? [] : ((attemptRows ?? []) as unknown as UserAttempt[]);
   const submittedAttemptCount = attemptError ? 0 : (typeof attemptCount === "number" ? attemptCount : userAttempts.length);
   const attemptQuestions = userAttempts.flatMap((attempt) =>
