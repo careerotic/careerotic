@@ -38,7 +38,7 @@ export default function RightNavigation() {
           <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-indigo-700">Question bank</p>
           <h2 className="mt-0.5 text-sm font-semibold text-slate-900">Browse subjects</h2>
         </div>
-        <nav aria-label="Subjects" className="max-h-[min(58vh,38rem)] overflow-y-auto p-1">
+        <nav aria-label="Subjects" className="p-1">
           {loading ? (
             <div className="space-y-1 p-1" role="status" aria-label="Loading subjects">
               {[1, 2, 3].map((item) => <Skeleton key={item} className="h-7 rounded bg-slate-100" />)}
@@ -59,9 +59,6 @@ export default function RightNavigation() {
             );
           })}
         </nav>
-        <div className="border-t border-slate-200/70 p-1">
-          <Link href="/questions" className="block rounded px-2 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">View all questions →</Link>
-        </div>
       </section>
     </aside>
   );
