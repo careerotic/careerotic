@@ -78,8 +78,8 @@ export default function GlobalFooter() {
         </div>
 
         <div className="mt-8 flex flex-col gap-2 border-t border-slate-200 pt-4 text-xs leading-5 text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-          <p>© 2026 Careerotic. All rights reserved.</p>
-          <p>Designed and developed by Faruk Islam</p>
+          <p className="text-center sm:text-left">© 2026 Careerotic. All rights reserved.</p>
+          <p className="text-center sm:text-right">Designed and developed by Faruk Islam</p>
         </div>
       </div>
     </footer>
