@@ -73,7 +73,7 @@ export default function GlobalFooter() {
 
         <div className="mt-5 flex flex-col gap-2 border-t border-slate-200 pt-3 text-xs leading-5 text-slate-500 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-center sm:text-left">© 2026 Careerotic. All rights reserved.</p>
-          <p className="text-center sm:text-right">Designed and developed by Faruk Islam</p>
+          <p className="text-center sm:text-right">Designed and developed by <Link href="https://www.facebook.com/FarukislamYT" target="_blank" rel="noopener noreferrer" className="rounded underline-offset-2 hover:text-blue-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">Faruk Islam</Link></p>
         </div>
       </div>
     </footer>
