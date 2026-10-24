@@ -6,6 +6,7 @@ import GlobalFooter from "./GlobalFooter";
 import GlobalHeader, { type HeaderUser } from "./GlobalHeader";
 import LeftNavigation from "./LeftNavigation";
 import MobileNavigationDrawer from "./MobileNavigationDrawer";
+import MobileBottomNavigation from "./MobileBottomNavigation";
 import RightNavigation from "./RightNavigation";
 
 type Props = { children: React.ReactNode; initialUser: HeaderUser | null };
@@ -24,8 +25,12 @@ export default function AppShell({ children, initialUser }: Props) {
       setMenuOpen(true);
     }
   }, [drawerOpen, pathname]);
+  const isExamAttempt =
+    pathname.startsWith("/attempt/") ||
+    (pathname.startsWith("/exam/") && (pathname.endsWith("/attempt") || pathname.includes("/attempt/")));
+  const showMobileBottomNavigation = !isExamAttempt;
 
-  // Authentication and administration pages keep their focused page layouts.
+  // Authentication and administration pages keep their existing focused layouts.
   if (
     pathname === "/admin" ||
     pathname.startsWith("/admin/") ||
@@ -36,7 +41,7 @@ export default function AppShell({ children, initialUser }: Props) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900">
+    <div className={`flex min-h-screen flex-col bg-slate-50 text-slate-900 ${showMobileBottomNavigation ? "pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0" : ""}`}>
       <GlobalHeader initialUser={initialUser} menuOpen={drawerOpen} onMenuClick={toggleMenu} />
       <MobileNavigationDrawer open={drawerOpen} onClose={closeMenu} />
       <div className="app-page-gutter mx-auto flex w-full max-w-[1760px] flex-1 flex-col">
@@ -52,6 +57,7 @@ export default function AppShell({ children, initialUser }: Props) {
         </div>
       </div>
       <GlobalFooter />
+      {showMobileBottomNavigation && <MobileBottomNavigation />}
     </div>
   );
 }
