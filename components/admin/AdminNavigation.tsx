@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 const groups = [
- { label:"Overview", items:[["/admin","Dashboard","▦"]] },
+ { label:"Overview", items:[["/admin","Dashboard","▦"],["/admin/analytics","Analytics","◔"]] },
  { label:"Question bank", items:[["/admin/questions","Questions","Q"],["/admin/subjects","Subjects","S"],["/admin/topics","Topics","T"],["/admin/reports","Question reports","⚑"],["/admin/bookmarks","Bookmarks","☆"]] },
  { label:"Exams & results", items:[["/admin/categories","Exam categories","C"],["/admin/exams","Exams","▤"],["/admin/attempts","Attempts","↗"],["/admin/results","Results","▥"],["/admin/resets","Reset history","↺"]] },
  { label:"Account", items:[["/admin/account","My account","◎"]] },
