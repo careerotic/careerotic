@@ -1,4 +1,5 @@
 import CommunityAnalyticsCharts from "@/app/components/home/community-analytics-charts";
+import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/exams/attempt-server";
 
 type SnapshotQuestion = {
@@ -16,6 +17,53 @@ type SubjectRow = {
 };
 
 type DayPoint = { key: string; label: string; attempts: number; answered: number; correct: number };
+const getCachedCommunityAttempts = unstable_cache(
+  async () => {
+    const admin = createAdminClient();
+    const [attemptResult, countResult] = await Promise.all([
+      admin
+        .from("exam_attempts")
+        .select("result_snapshot,submitted_at")
+        .eq("status", "submitted")
+        .not("result_snapshot", "is", null)
+        .order("submitted_at", { ascending: false })
+        .limit(500),
+      admin
+        .from("exam_attempts")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "submitted")
+        .not("result_snapshot", "is", null),
+    ]);
+
+    if (attemptResult.error || countResult.error) {
+      throw new Error("Community analytics query failed.");
+    }
+
+    return {
+      rows: (attemptResult.data ?? []) as CommunityAttempt[],
+      totalAttempts: countResult.count ?? 0,
+    };
+  },
+  ["community-analytics-attempts-v1"],
+  { revalidate: 60, tags: ["community-analytics"] },
+);
+
+const getCachedCommunityQuestionSubjects = unstable_cache(
+  async (questionIds: string[]) => {
+    if (questionIds.length === 0) return [];
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("questions")
+      .select("id,status,topics(name,subjects(name,slug))")
+      .eq("status", "published")
+      .in("id", questionIds);
+    if (error) throw new Error("Community analytics taxonomy query failed.");
+    return data ?? [];
+  },
+  ["community-analytics-question-subjects-v1"],
+  { revalidate: 300, tags: ["community-analytics", "public-taxonomy"] },
+);
+
 
 function getSnapshotQuestions(value: unknown): SnapshotQuestion[] {
   if (!value || typeof value !== "object" || Array.isArray(value)) return [];
@@ -37,28 +85,9 @@ export default async function CommunityAnalytics() {
   let unavailable = false;
 
   try {
-    const admin = createAdminClient();
-    const [attemptResult, countResult] = await Promise.all([
-      admin
-        .from("exam_attempts")
-        .select("result_snapshot,submitted_at")
-        .eq("status", "submitted")
-        .not("result_snapshot", "is", null)
-        .order("submitted_at", { ascending: false })
-        .limit(500),
-      admin
-        .from("exam_attempts")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "submitted")
-        .not("result_snapshot", "is", null),
-    ]);
-
-    if (attemptResult.error || countResult.error) {
-      unavailable = true;
-    } else {
-      rows = (attemptResult.data ?? []) as CommunityAttempt[];
-      totalAttempts = countResult.count ?? 0;
-    }
+    const result = await getCachedCommunityAttempts();
+    rows = result.rows;
+    totalAttempts = result.totalAttempts;
   } catch {
     unavailable = true;
   }
@@ -114,46 +143,30 @@ export default async function CommunityAnalytics() {
   }
 
   try {
-    const ids = [...questionIds].slice(0, 1000);
-    if (ids.length) {
-      const admin = createAdminClient();
-      const { data, error } = await admin
-        .from("questions")
-        .select("id,status,topics(name,subjects(name,slug))")
-        .eq("status", "published")
-        .in("id", ids);
-      if (!error) {
-        for (const item of (data ?? []) as unknown as (SubjectRow & { status?: string })[]) {
-          const subject = item.topics?.subjects;
-          if (!subject?.slug || !subject.name) continue;
+    const ids = [...questionIds].slice(0, 1000).sort();
+    if (ids.length > 0) {
+      const data = await getCachedCommunityQuestionSubjects(ids);
+      const subjectByQuestion = new Map<string, { name: string; slug: string }>();
+
+      for (const item of data as unknown as SubjectRow[]) {
+        const subject = item.topics?.subjects;
+        if (subject?.slug && subject.name) subjectByQuestion.set(item.id, subject);
+      }
+
+      for (const row of rows) {
+        for (const question of getSnapshotQuestions(row.result_snapshot)) {
+          if (!question.question_id || !hasAnswer(question) || typeof question.selected_is_correct !== "boolean") continue;
+          const subject = subjectByQuestion.get(question.question_id);
+          if (!subject) continue;
           const current = subjectCounts.get(subject.slug) ?? {
             name: subject.name,
             slug: subject.slug,
             answered: 0,
             correct: 0,
           };
+          current.answered += 1;
+          if (question.selected_is_correct) current.correct += 1;
           subjectCounts.set(subject.slug, current);
-        }
-        const subjectByQuestion = new Map<string, { name: string; slug: string }>();
-        for (const item of (data ?? []) as unknown as SubjectRow[]) {
-          const subject = item.topics?.subjects;
-          if (subject?.slug && subject.name) subjectByQuestion.set(item.id, subject);
-        }
-        for (const row of rows) {
-          for (const question of getSnapshotQuestions(row.result_snapshot)) {
-            if (!question.question_id || !hasAnswer(question) || typeof question.selected_is_correct !== "boolean") continue;
-            const subject = subjectByQuestion.get(question.question_id);
-            if (!subject) continue;
-            const current = subjectCounts.get(subject.slug) ?? {
-              name: subject.name,
-              slug: subject.slug,
-              answered: 0,
-              correct: 0,
-            };
-            current.answered += 1;
-            if (question.selected_is_correct) current.correct += 1;
-            subjectCounts.set(subject.slug, current);
-          }
         }
       }
     }
