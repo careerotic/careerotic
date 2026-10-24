@@ -29,10 +29,17 @@ function LineChart({
   const maxValue = mode === "attempts" ? Math.max(4, ...values.filter((value): value is number => value !== null)) : 100;
   const x = (index: number) => left + (points.length <= 1 ? 0 : (index / (points.length - 1)) * (right - left));
   const y = (value: number) => bottom - (Math.max(0, Math.min(maxValue, value)) / maxValue) * (bottom - top);
-  const path = values.reduce((result, value, index) => {
-    if (value === null) return result;
-    return result + `${result ? " L" : "M"} ${x(index).toFixed(1)} ${y(value).toFixed(1)}`;
-  }, "");
+  const paths: string[] = [];
+  let activePath = "";
+  values.forEach((value, index) => {
+    if (value === null) {
+      if (activePath) paths.push(activePath);
+      activePath = "";
+      return;
+    }
+    activePath += `${activePath ? " L" : "M"} ${x(index).toFixed(1)} ${y(value).toFixed(1)}`;
+  });
+  if (activePath) paths.push(activePath);
   const color = mode === "attempts" ? "#4f46e5" : "#059669";
   const ticks = mode === "attempts" ? [0, Math.round(maxValue / 2), maxValue] : [0, 50, 100];
   const total = values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
@@ -62,7 +69,7 @@ function LineChart({
             <text x={left - 8} y={y(tick) + 4} textAnchor="end" fill="#64748b" fontSize="10">{tick}{mode === "accuracy" ? "%" : ""}</text>
           </g>
         ))}
-        {path && <path d={path} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
+        {paths.map((path, index) => <path key={index} d={path} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />)}
         {values.map((value, index) => value === null ? null : (
           <circle key={points[index].key} cx={x(index)} cy={y(value)} r="3.5" fill={color} stroke="#fff" strokeWidth="1.5">
             <title>{points[index].label}: {value}{mode === "accuracy" ? "%" : " exams"}</title>
