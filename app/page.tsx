@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { createAdminClient, GUEST_ID_COOKIE, sha256 } from "@/lib/exams/attempt-server";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedHomePublicData } from "@/lib/cache/public-data";
+import CommunityAnalytics from "@/app/components/home/community-analytics";
 
 const primaryButton =
   "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md bg-indigo-700 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1";
@@ -364,6 +365,8 @@ export default async function Home() {
           )}
         </section>
       )}
+
+      <CommunityAnalytics />
 
       {(user || analytics.hasIdentity) && (
         <section aria-labelledby="performance-analytics-heading" className="space-y-3 rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
