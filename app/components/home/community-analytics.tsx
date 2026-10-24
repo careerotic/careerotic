@@ -1,3 +1,4 @@
+import CommunityAnalyticsCharts from "@/app/components/home/community-analytics-charts";
 import { createAdminClient } from "@/lib/exams/attempt-server";
 
 type SnapshotQuestion = {
@@ -28,78 +29,6 @@ function getSnapshotQuestions(value: unknown): SnapshotQuestion[] {
 
 function hasAnswer(question: SnapshotQuestion) {
   return Boolean(question.selected_option || question.selected_option_id);
-}
-
-function LineChart({
-  points,
-  valueKey,
-  label,
-  color,
-  suffix = "",
-}: {
-  points: { label: string; value: number | null }[];
-  valueKey: string;
-  label: string;
-  color: string;
-  suffix?: string;
-}) {
-  const chartWidth = 680;
-  const chartHeight = 190;
-  const left = 30;
-  const right = 650;
-  const top = 16;
-  const bottom = 148;
-  const values = points.map((point) => point.value).filter((value): value is number => value !== null);
-  const maxValue = valueKey === "attempts" ? Math.max(4, ...values) : 100;
-  const x = (index: number) => left + (points.length <= 1 ? 0 : (index / (points.length - 1)) * (right - left));
-  const y = (value: number) => bottom - (Math.max(0, Math.min(maxValue, value)) / maxValue) * (bottom - top);
-  const segments: string[] = [];
-  let activeSegment: string[] = [];
-  points.forEach((point, index) => {
-    if (point.value === null) {
-      if (activeSegment.length) segments.push(activeSegment.join(" "));
-      activeSegment = [];
-      return;
-    }
-    activeSegment.push(`${activeSegment.length ? "L" : "M"} ${x(index).toFixed(1)} ${y(point.value).toFixed(1)}`);
-  });
-  if (activeSegment.length) segments.push(activeSegment.join(" "));
-  const ticks = valueKey === "attempts"
-    ? [0, Math.round(maxValue / 2), maxValue]
-    : [0, 50, 100];
-
-  return (
-    <div className="min-w-0">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-slate-900">{label}</p>
-        <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500">
-          <span className="h-0.5 w-4 rounded" style={{ backgroundColor: color }} />
-          {valueKey === "attempts" ? "প্রতি দিন" : "দৈনিক হার"}
-        </span>
-      </div>
-      <svg role="img" aria-label={label} viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="mt-2 block w-full overflow-visible">
-        {ticks.map((tick, index) => (
-          <g key={`${tick}-${index}`}>
-            <line x1={left} y1={y(tick)} x2={right} y2={y(tick)} stroke="#e2e8f0" strokeDasharray="3 4" />
-            <text x={left - 8} y={y(tick) + 4} textAnchor="end" fill="#64748b" fontSize="10">
-              {tick}{suffix}
-            </text>
-          </g>
-        ))}
-        {segments.map((segment, index) => (
-          <path key={index} d={segment} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-        ))}
-        {points.map((point, index) => point.value === null ? null : (
-          <circle key={point.label} cx={x(index)} cy={y(point.value)} r="3.5" fill={color} stroke="#fff" strokeWidth="1.5">
-            <title>{point.label}: {point.value}{suffix}</title>
-          </circle>
-        ))}
-        {points.map((point, index) => index % 3 === 0 || index === points.length - 1 ? (
-          <text key={point.label} x={x(index)} y="172" textAnchor="middle" fill="#64748b" fontSize="10">{point.label}</text>
-        ) : null)}
-      </svg>
-    </div>
-  );
 }
 
 export default async function CommunityAnalytics() {
@@ -145,7 +74,7 @@ export default async function CommunityAnalytics() {
 
   const today = new Date();
   const dayKeys: string[] = [];
-  for (let offset = 13; offset >= 0; offset -= 1) {
+  for (let offset = 29; offset >= 0; offset -= 1) {
     const date = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - offset));
     dayKeys.push(date.toISOString().slice(0, 10));
   }
@@ -233,11 +162,6 @@ export default async function CommunityAnalytics() {
   }
 
   const days = [...dayMap.values()];
-  const attemptsLine = days.map((day) => ({ label: day.label, value: day.attempts }));
-  const accuracyLine = days.map((day) => ({
-    label: day.label,
-    value: day.answered > 0 ? Math.round((day.correct / day.answered) * 100) : null,
-  }));
   const subjectBars = [...subjectCounts.values()]
     .filter((subject) => subject.answered >= 3)
     .map((subject) => ({
@@ -256,7 +180,7 @@ export default async function CommunityAnalytics() {
           <h2 id="community-analytics-heading" className="mt-0.5 text-base font-bold tracking-tight text-slate-950">কমিউনিটির শেখার অ্যানালিটিক্স</h2>
           <p className="mt-0.5 text-xs leading-4 text-slate-500">সব দর্শকের জন্য প্রকাশিত সমষ্টিগত পরিসংখ্যান; ব্যক্তিগত ফলাফল এখানে দেখানো হয় না।</p>
         </div>
-        <span className="rounded-md bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-600">সর্বশেষ ৫০০টি জমা পরীক্ষা পর্যন্ত চার্ট</span>
+        <span className="rounded-md bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-600">সর্বশেষ ৫০০টি জমা পরীক্ষা পর্যন্ত চার্ট · ৭/১৪/৩০ দিনের ভিউ</span>
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -292,18 +216,17 @@ export default async function CommunityAnalytics() {
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-rose-100">
             <div className="h-full rounded-full bg-indigo-600" style={{ width: `${(correct / answered) * 100}%` }} />
           </div>
-          <p className="mt-1 text-[10px] text-slate-500">চার্টের নির্ভুলতা সর্বশেষ ৫০০টি জমা পরীক্ষার উপলভ্য উত্তর থেকে গণনা করা হয়েছে।</p>
+          <p className="mt-1 text-[10px] text-slate-500">কমিউনিটির সামগ্রিক হার সর্বশেষ ৫০০টি জমা পরীক্ষার উপলভ্য উত্তর থেকে গণনা করা হয়েছে।</p>
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="min-w-0 rounded-md border border-slate-200 p-3">
-          <LineChart points={attemptsLine} valueKey="attempts" label="১৪ দিনের পরীক্ষার প্রবণতা" color="#4f46e5" />
-        </div>
-        <div className="min-w-0 rounded-md border border-slate-200 p-3">
-          <LineChart points={accuracyLine} valueKey="accuracy" label="১৪ দিনের সঠিক উত্তরের হার" color="#059669" suffix="%" />
-        </div>
-      </div>
+      <CommunityAnalyticsCharts points={days.map((day) => ({
+        key: day.key,
+        label: day.label,
+        attempts: day.attempts,
+        answered: day.answered,
+        correct: day.correct,
+      }))} />
 
       {subjectBars.length > 0 && (
         <div className="rounded-md border border-slate-200 p-3">
@@ -326,7 +249,7 @@ export default async function CommunityAnalytics() {
       )}
 
       <p className="text-[10px] leading-4 text-slate-500">
-        {recentAttempts.toLocaleString("bn-BD")}টি জমা পরীক্ষা গত ১৪ দিনের মধ্যে হয়েছে। পুরোনো রেকর্ড মোট পরীক্ষার সংখ্যায় অন্তর্ভুক্ত, তবে চার্টে সর্বশেষ ৫০০টি রেকর্ডের ভিত্তিতে প্রবণতা দেখানো হয়।
+        {recentAttempts.toLocaleString("bn-BD")}টি জমা পরীক্ষা গত ১৪ দিনের মধ্যে হয়েছে। পুরোনো রেকর্ড মোট পরীক্ষার সংখ্যায় অন্তর্ভুক্ত, তবে প্রবণতা ও বিষয়ভিত্তিক হিসাব সর্বশেষ ৫০০টি রেকর্ডের ভিত্তিতে।
       </p>
     </section>
   );
