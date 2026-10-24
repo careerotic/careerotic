@@ -18,14 +18,16 @@ export default function SignupPage() {
 
   function getNextPath() {
     const value = new URLSearchParams(window.location.search).get("next");
-    return value && value.startsWith("/") && !value.startsWith("//") ? value : "/dashboard";
+    if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes(String.fromCharCode(92))) return "/dashboard";
+    if (["/login", "/signup", "/forgot-password", "/reset-password", "/auth"].some((path) => value === path || value.startsWith(path + "/") || value.startsWith(path + "?") || value.startsWith(path + "#"))) return "/dashboard";
+    return value;
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setSuccess("");
-    if (dateOfBirth > new Date().toLocaleDateString("en-CA")) return setError("Date of birth cannot be in the future.");
+    if (dateOfBirth > new Date().toISOString().slice(0, 10)) return setError("Date of birth cannot be in the future.");
     if (password !== confirmPassword) return setError("Passwords do not match.");
     if (password.length < 8) return setError("Use a password with at least 8 characters.");
 

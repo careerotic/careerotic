@@ -24,7 +24,12 @@ export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const admin = path === "/admin" || path.startsWith("/admin/");
   const protectedPath = ["/dashboard", "/account", "/saved-questions"].some((p) => path === p || path.startsWith(p + "/"));
-  const safeNextPath = (value: string | null) => value && value.startsWith("/") && !value.startsWith("//") ? value : "/dashboard";
+  const safeNextPath = (value: string | null) => {
+    if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes(String.fromCharCode(92))) return "/dashboard";
+    const blocked = ["/login", "/signup", "/forgot-password", "/reset-password", "/auth"];
+    if (blocked.some((item) => value === item || value.startsWith(item + "/") || value.startsWith(item + "?") || value.startsWith(item + "#"))) return "/dashboard";
+    return value;
+  };
   if (admin && !signedIn) {
     const target = request.nextUrl.clone(); target.pathname = "/login"; target.search = ""; target.searchParams.set("next", path);
     return NextResponse.redirect(target);
