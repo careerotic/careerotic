@@ -1,5 +1,3 @@
-"use server";
-
 import { createAdminClient } from "@/lib/exams/attempt-server";
 
 type SnapshotQuestion = {
