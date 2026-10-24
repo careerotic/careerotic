@@ -143,41 +143,32 @@ export default async function CommunityAnalytics() {
   }
 
   try {
-    const ids = [...questionIds].slice(0, 1000);
-    if (ids.length) {
-      const data = await getCachedCommunityQuestionSubjects(ids.sort());
-      for (const item of (data ?? []) as unknown as (SubjectRow & { status?: string })[]) {
-          const subject = item.topics?.subjects;
-          if (!subject?.slug || !subject.name) continue;
+    const ids = [...questionIds].slice(0, 1000).sort();
+    if (ids.length > 0) {
+      const data = await getCachedCommunityQuestionSubjects(ids);
+      const subjectByQuestion = new Map<string, { name: string; slug: string }>();
+
+      for (const item of data as unknown as SubjectRow[]) {
+        const subject = item.topics?.subjects;
+        if (subject?.slug && subject.name) subjectByQuestion.set(item.id, subject);
+      }
+
+      for (const row of rows) {
+        for (const question of getSnapshotQuestions(row.result_snapshot)) {
+          if (!question.question_id || !hasAnswer(question) || typeof question.selected_is_correct !== "boolean") continue;
+          const subject = subjectByQuestion.get(question.question_id);
+          if (!subject) continue;
           const current = subjectCounts.get(subject.slug) ?? {
             name: subject.name,
             slug: subject.slug,
             answered: 0,
             correct: 0,
           };
+          current.answered += 1;
+          if (question.selected_is_correct) current.correct += 1;
           subjectCounts.set(subject.slug, current);
+        }
       }
-      const subjectByQuestion = new Map<string, { name: string; slug: string }>();
-        for (const item of (data ?? []) as unknown as SubjectRow[]) {
-          const subject = item.topics?.subjects;
-          if (subject?.slug && subject.name) subjectByQuestion.set(item.id, subject);
-        }
-        for (const row of rows) {
-          for (const question of getSnapshotQuestions(row.result_snapshot)) {
-            if (!question.question_id || !hasAnswer(question) || typeof question.selected_is_correct !== "boolean") continue;
-            const subject = subjectByQuestion.get(question.question_id);
-            if (!subject) continue;
-            const current = subjectCounts.get(subject.slug) ?? {
-              name: subject.name,
-              slug: subject.slug,
-              answered: 0,
-              correct: 0,
-            };
-            current.answered += 1;
-            if (question.selected_is_correct) current.correct += 1;
-            subjectCounts.set(subject.slug, current);
-          }
-        }
     }
   } catch {
     // Public totals and timelines remain useful if taxonomy lookup is unavailable.
