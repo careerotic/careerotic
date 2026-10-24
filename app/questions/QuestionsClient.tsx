@@ -63,6 +63,9 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
   const [total, setTotal] = useState(initialTotal);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [openAnswers, setOpenAnswers] = useState<Record<string, boolean>>({});
+  const [answerLoading, setAnswerLoading] = useState<Record<string, boolean>>({});
+  const [answerErrors, setAnswerErrors] = useState<Record<string, string>>({});
+  const preloadInFlight = useRef(new Set<string>());
   const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(initialLoadFailed);
   const [error, setError] = useState("");
@@ -158,33 +161,41 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
   }, [loadQuestions, supabase, initialLoadFailed, initialPage, page, subjectId, topicId, language, search, sort]);
 
   useEffect(() => {
-    const client = supabase;
-    if (!client || questions.length === 0) return;
+    if (!supabase || questions.length === 0) return;
     let active = true;
+
     async function preloadAnswers() {
-      const missing = questions.filter((question) => !answers[question.id]);
+      const missing = questions.filter(
+        (question) => !answers[question.id] && !preloadInFlight.current.has(question.id),
+      );
       for (let index = 0; index < missing.length; index += 5) {
         const batch = missing.slice(index, index + 5);
+        batch.forEach((question) => preloadInFlight.current.add(question.id));
         let payload: { answers?: Record<string, unknown> } | null = null;
         try {
-          const response = await fetch(`/api/questions/answers?ids=${encodeURIComponent(batch.map((question) => question.id).join(","))}`);
+          const response = await fetch("/api/questions/answers?ids=" + encodeURIComponent(batch.map((question) => question.id).join(",")));
           if (response.ok) payload = await response.json() as { answers?: Record<string, unknown> };
         } catch {
-          // A failed preload must not interrupt browsing.
+          // Preloading is best-effort; the Show answer action retries on demand.
+        } finally {
+          batch.forEach((question) => preloadInFlight.current.delete(question.id));
         }
+
+        if (!active) return;
         const results = batch.map((question) => {
           const parsed = answerFromJson(payload?.answers?.[question.id]);
           return parsed ? [question.id, parsed] as const : null;
         });
-        if (results.every((result) => result === null)) continue;
-        if (!active) return;
-        setAnswers((current) => {
-          const next = { ...current };
-          results.forEach((result) => { if (result) next[result[0]] = result[1]; });
-          return next;
-        });
+        if (results.some((result) => result !== null)) {
+          setAnswers((current) => {
+            const next = { ...current };
+            results.forEach((result) => { if (result) next[result[0]] = result[1]; });
+            return next;
+          });
+        }
       }
     }
+
     void preloadAnswers();
     return () => { active = false; };
   }, [questions, supabase, answers]);
@@ -211,6 +222,38 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
   }, [questions, supabase]);
 
   // Reset pagination in filter handlers, not on mount, so URL page=N survives initial render.
+
+  async function toggleAnswer(question: Question) {
+    if (openAnswers[question.id]) {
+      setOpenAnswers((current) => ({ ...current, [question.id]: false }));
+      return;
+    }
+    if (answers[question.id]) {
+      setAnswerErrors((current) => ({ ...current, [question.id]: "" }));
+      setOpenAnswers((current) => ({ ...current, [question.id]: true }));
+      return;
+    }
+    if (answerLoading[question.id]) return;
+
+    setAnswerLoading((current) => ({ ...current, [question.id]: true }));
+    setAnswerErrors((current) => ({ ...current, [question.id]: "" }));
+    try {
+      const response = await fetch("/api/questions/answers?ids=" + encodeURIComponent(question.id));
+      if (!response.ok) throw new Error("Could not load the answer. Please try again.");
+      const payload = await response.json() as { answers?: Record<string, unknown> };
+      const answer = answerFromJson(payload.answers?.[question.id]);
+      if (!answer?.correct_option) throw new Error("The answer is not available for this question.");
+      setAnswers((current) => ({ ...current, [question.id]: answer }));
+      setOpenAnswers((current) => ({ ...current, [question.id]: true }));
+    } catch (caught) {
+      setAnswerErrors((current) => ({
+        ...current,
+        [question.id]: caught instanceof Error ? caught.message : "Could not load the answer. Please try again.",
+      }));
+    } finally {
+      setAnswerLoading((current) => ({ ...current, [question.id]: false }));
+    }
+  }
 
   async function toggleBookmark(question: Question) {
     if (!supabase) { setNotice("Supabase is not configured for this deployment."); return; }
@@ -312,7 +355,9 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
                 topic={question.topics?.name ?? "Topic"}
                 answer={answers[question.id]}
                 isOpen={Boolean(openAnswers[question.id])}
-                onToggleAnswer={() => setOpenAnswers((current) => ({ ...current, [question.id]: !current[question.id] }))}
+                answerLoading={Boolean(answerLoading[question.id])}
+                answerError={answerErrors[question.id]}
+                onToggleAnswer={() => void toggleAnswer(question)}
                 bookmarked={Boolean(bookmarks[question.id])}
                 onToggleBookmark={() => void toggleBookmark(question)}
                 onReport={() => { setReportQuestion(question); setReportReason("incorrect_answer"); setReportDetails(""); }}
