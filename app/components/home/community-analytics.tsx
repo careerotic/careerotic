@@ -249,7 +249,7 @@ export default async function CommunityAnalytics() {
       )}
 
       <p className="text-[10px] leading-4 text-slate-500">
-        {recentAttempts.toLocaleString("bn-BD")}টি জমা পরীক্ষা গত ১৪ দিনের মধ্যে হয়েছে। পুরোনো রেকর্ড মোট পরীক্ষার সংখ্যায় অন্তর্ভুক্ত, তবে প্রবণতা ও বিষয়ভিত্তিক হিসাব সর্বশেষ ৫০০টি রেকর্ডের ভিত্তিতে।
+        {recentAttempts.toLocaleString("bn-BD")}টি জমা পরীক্ষা গত ৩০ দিনের মধ্যে হয়েছে। পুরোনো রেকর্ড মোট পরীক্ষার সংখ্যায় অন্তর্ভুক্ত, তবে প্রবণতা ও বিষয়ভিত্তিক হিসাব সর্বশেষ ৫০০টি রেকর্ডের ভিত্তিতে।
       </p>
     </section>
   );
