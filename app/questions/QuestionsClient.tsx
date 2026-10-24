@@ -261,7 +261,7 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     setNotice("");
     const { data: userResult, error: authError } = await supabase.auth.getUser();
     if (authError || !userResult.user) {
-      setNotice("Sign in to save bookmarks.");
+      setNotice("Sign in to save questions.");
       return;
     }
     if (bookmarks[question.id]) {
@@ -338,7 +338,10 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
           </div>
         </div>
 
-        {(error || notice) && <div role={error ? "alert" : "status"} className={`rounded-md border px-3 py-2 text-sm ${error ? "border-red-200 bg-red-50 text-red-700" : "border-indigo-100 bg-indigo-50 text-indigo-800"}`}>{error || notice}</div>}
+        {(error || notice) && <div role={error || notice === "Sign in to save questions." ? "alert" : "status"} className={`rounded-md border px-3 py-2 text-sm ${error ? "border-red-200 bg-red-50 text-red-700" : "border-indigo-100 bg-indigo-50 text-indigo-800"}`}>
+          <span>{error || notice}</span>
+          {!error && notice === "Sign in to save questions." && <span className="ml-2 inline-flex flex-wrap gap-2 font-semibold"><a className="underline" href={`/login?next=${encodeURIComponent("/questions")}`}>Sign in</a><a className="underline" href={`/signup?next=${encodeURIComponent("/questions")}`}>Create account</a></span>}
+        </div>}
 
         <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-sm">
           <span className="font-medium text-slate-700">Question bank</span>
