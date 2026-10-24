@@ -23,7 +23,8 @@ export async function proxy(request: NextRequest) {
   const signedIn = Boolean(claims && !result.error);
   const path = request.nextUrl.pathname;
   const admin = path === "/admin" || path.startsWith("/admin/");
-  const protectedPath = ["/dashboard", "/account"].some((p) => path === p || path.startsWith(p + "/"));
+  const protectedPath = ["/dashboard", "/account", "/saved-questions"].some((p) => path === p || path.startsWith(p + "/"));
+  const safeNextPath = (value: string | null) => value && value.startsWith("/") && !value.startsWith("//") ? value : "/dashboard";
   if (admin && !signedIn) {
     const target = request.nextUrl.clone(); target.pathname = "/login"; target.search = ""; target.searchParams.set("next", path);
     return NextResponse.redirect(target);
@@ -37,7 +38,10 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(target);
   }
   if (signedIn && ["/signup", "/login", "/forgot-password"].includes(path)) {
-    const target = request.nextUrl.clone(); target.pathname = "/dashboard"; target.search = "";
+    const target = request.nextUrl.clone();
+    const destination = safeNextPath(request.nextUrl.searchParams.get("next"));
+    target.pathname = destination.split("?")[0];
+    target.search = destination.includes("?") ? destination.slice(destination.indexOf("?")) : "";
     return NextResponse.redirect(target);
   }
   return response;
