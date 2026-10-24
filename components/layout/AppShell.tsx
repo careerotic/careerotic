@@ -27,7 +27,7 @@ export default function AppShell({ children, initialUser }: Props) {
   }, [drawerOpen, pathname]);
   const isExamAttempt =
     pathname.startsWith("/attempt/") ||
-    (pathname.startsWith("/exam/") && pathname.includes("/attempt/"));
+    (pathname.startsWith("/exam/") && (pathname.endsWith("/attempt") || pathname.includes("/attempt/")));
   const showMobileBottomNavigation = !isExamAttempt;
 
   // Authentication and administration pages keep their existing focused layouts.
