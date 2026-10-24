@@ -260,8 +260,14 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     setError("");
     setNotice("");
     const { data: userResult, error: authError } = await supabase.auth.getUser();
-    if (authError || !userResult.user) {
-      setNotice("Sign in to save questions.");
+    if (authError) {
+      setError("Unable to verify your sign-in status. Please try again.");
+      return;
+    }
+    if (!userResult.user) {
+      window.alert("Please sign in to save this question. You will return to the question bank after signing in.");
+      const next = window.location.pathname + window.location.search + window.location.hash;
+      window.location.assign("/login?next=" + encodeURIComponent(next));
       return;
     }
     if (bookmarks[question.id]) {

@@ -16,7 +16,7 @@ function LoginForm() {
   const [error, setError] = useState("");
   const nextPath = searchParams.get("next");
   const callbackError = searchParams.get("auth_error") === "confirmation" ? "That confirmation link is invalid or expired. Request a new email or sign in if your account is already confirmed." : "";
-  const destination = nextPath?.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/dashboard";
+  const destination = nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//") && !nextPath.includes(String.fromCharCode(92)) && !["/login", "/signup", "/forgot-password", "/reset-password", "/auth"].some((path) => nextPath === path || nextPath.startsWith(path + "/") || nextPath.startsWith(path + "?") || nextPath.startsWith(path + "#")) ? nextPath : "/dashboard";
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError("");
