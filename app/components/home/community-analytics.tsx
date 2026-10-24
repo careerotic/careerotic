@@ -146,8 +146,7 @@ export default async function CommunityAnalytics() {
     const ids = [...questionIds].slice(0, 1000);
     if (ids.length) {
       const data = await getCachedCommunityQuestionSubjects(ids.sort());
-      {
-        for (const item of (data ?? []) as unknown as (SubjectRow & { status?: string })[]) {
+      for (const item of (data ?? []) as unknown as (SubjectRow & { status?: string })[]) {
           const subject = item.topics?.subjects;
           if (!subject?.slug || !subject.name) continue;
           const current = subjectCounts.get(subject.slug) ?? {
@@ -157,8 +156,8 @@ export default async function CommunityAnalytics() {
             correct: 0,
           };
           subjectCounts.set(subject.slug, current);
-        }
-        const subjectByQuestion = new Map<string, { name: string; slug: string }>();
+      }
+      const subjectByQuestion = new Map<string, { name: string; slug: string }>();
         for (const item of (data ?? []) as unknown as SubjectRow[]) {
           const subject = item.topics?.subjects;
           if (subject?.slug && subject.name) subjectByQuestion.set(item.id, subject);
@@ -179,7 +178,6 @@ export default async function CommunityAnalytics() {
             subjectCounts.set(subject.slug, current);
           }
         }
-      }
     }
   } catch {
     // Public totals and timelines remain useful if taxonomy lookup is unavailable.
