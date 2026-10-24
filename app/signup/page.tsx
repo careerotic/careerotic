@@ -27,7 +27,7 @@ export default function SignupPage() {
     event.preventDefault();
     setError("");
     setSuccess("");
-    if (dateOfBirth > new Date().toISOString().slice(0, 10)) return setError("Date of birth cannot be in the future.");
+    if (dateOfBirth && new Date(dateOfBirth + "T00:00:00") > new Date()) return setError("Date of birth cannot be in the future.");
     if (password !== confirmPassword) return setError("Passwords do not match.");
     if (password.length < 8) return setError("Use a password with at least 8 characters.");
 
@@ -80,7 +80,7 @@ export default function SignupPage() {
             {success && <p role="status" className="rounded-lg bg-emerald-50 px-3.5 py-3 text-sm text-emerald-800">{success}</p>}
             <button type="submit" disabled={busy || (confirmPassword.length > 0 && confirmPassword !== password)} className="w-full rounded-lg bg-indigo-700 px-4 py-3 font-semibold text-white hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60">{busy ? "Creating account…" : "Create Account"}</button>
           </form>
-          <p className="mt-6 text-center text-sm text-slate-600">Already have an account? <Link href="/login" className="font-semibold text-indigo-700 underline">Sign in</Link></p>
+          <p className="mt-6 text-center text-sm text-slate-600">Already have an account? <Link href="/login" onClick={(event) => { const nextPath = getNextPath(); if (nextPath !== "/dashboard") { event.preventDefault(); window.location.assign("/login?next=" + encodeURIComponent(nextPath)); } }} className="font-semibold text-indigo-700 underline">Sign in</Link></p>
         </section>
       </div>
     </main>
