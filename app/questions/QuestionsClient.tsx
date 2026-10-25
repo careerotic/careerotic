@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import QuestionBankCard from "@/components/questions/QuestionBankCard";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { clearClientCache, readClientCache, writeClientCache } from "@/lib/cache/client-memory";
 
 type Option = { id: string; question_id: string; option_text: string; option_order: number };
 type Question = {
@@ -17,6 +18,12 @@ type Question = {
 };
 type Answer = { question_id?: string; explanation?: string | null; options?: { id?: string; option_id?: string; option_text?: string; text?: string; option_order?: number }[]; correct_option?: { id?: string; option_id?: string; option_text?: string; text?: string } | null };
 type ReportReason = "incorrect_answer" | "incorrect_question" | "unclear_explanation" | "other";
+
+type QuestionPageData = { questions: Question[]; total: number };
+
+function questionCacheKey(page: number, subjectId: string, topicId: string, language: string, search: string, sort: string) {
+  return `public:questions:${new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE), subjectId, topicId, language, search, sort }).toString()}`;
+}
 
 const PAGE_SIZE = 25;
 const inputClass = "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100";
@@ -41,6 +48,7 @@ function answerFromJson(value: unknown): Answer | null {
 export default function QuestionsClient({ initialQuestions, initialLoadFailed = false, initialPage = 1, initialTotal = 0 }: { initialQuestions: Question[]; initialLoadFailed?: boolean; initialPage?: number; initialTotal?: number }) {
   const [supabase, setSupabase] = useState<ReturnType<typeof createClient> | null>(null);
   const skipInitialQuestionFetch = useRef(true);
+  const questionRequestSequence = useRef(0);
 
   useEffect(() => {
     try {
@@ -67,6 +75,7 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
   const [answerErrors, setAnswerErrors] = useState<Record<string, string>>({});
   const preloadInFlight = useRef(new Set<string>());
   const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
+  const [loginPromptQuestion, setLoginPromptQuestion] = useState<Question | null>(null);
   const [loading, setLoading] = useState(initialLoadFailed);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -75,6 +84,47 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
   const [reportDetails, setReportDetails] = useState("");
   const [reportBusy, setReportBusy] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
+  useEffect(() => {
+    if (initialLoadFailed) return;
+
+    const key = questionCacheKey(initialPage, "all", "all", "all", "", "newest");
+    const cached = readClientCache<QuestionPageData>(key, 60 * 1000, 10 * 60 * 1000);
+    const showingInitialQuery =
+      page === initialPage &&
+      subjectId === "all" &&
+      topicId === "all" &&
+      language === "all" &&
+      search === "" &&
+      sort === "newest";
+
+    // Never replace a fresher client entry with an older server-rendered cache entry.
+    if (cached?.isFresh) {
+      if (showingInitialQuery) {
+        setQuestions(cached.data.questions);
+        setTotal(cached.data.total);
+      }
+      return;
+    }
+
+    // Server-rendered data is available without a client fetch; use it to refresh stale entries.
+    writeClientCache<QuestionPageData>(key, { questions: initialQuestions, total: initialTotal });
+    if (showingInitialQuery) {
+      setQuestions(initialQuestions);
+      setTotal(initialTotal);
+    }
+  }, [
+    initialQuestions,
+    initialPage,
+    initialTotal,
+    initialLoadFailed,
+    page,
+    subjectId,
+    topicId,
+    language,
+    search,
+    sort,
+  ]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -88,6 +138,16 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     if (!client) return;
     let active = true;
     async function loadTaxonomy() {
+      const cached = readClientCache<{
+        subjects: { id: string; name: string; slug: string }[];
+        topics: { id: string; name: string; subject_id: string }[];
+      }>("public:taxonomy", 5 * 60 * 1000, 30 * 60 * 1000);
+      if (cached) {
+        setSubjects(cached.data.subjects.map(({ id, name }) => ({ id, name })));
+        setTopics(cached.data.topics);
+        if (cached.isFresh) return;
+      }
+
       try {
         const response = await fetch("/api/public/taxonomy");
         if (!response.ok) throw new Error("Unable to load filters.");
@@ -96,10 +156,11 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
           topics: { id: string; name: string; subject_id: string }[];
         };
         if (!active) return;
+        writeClientCache("public:taxonomy", payload);
         setSubjects(payload.subjects.map(({ id, name }) => ({ id, name })));
         setTopics(payload.topics);
       } catch {
-        if (active) setError("Unable to load filters.");
+        if (active && !cached) setError("Unable to load filters.");
       }
     }
     void loadTaxonomy();
@@ -113,9 +174,22 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
 
   const loadQuestions = useCallback(async () => {
     if (!supabase) return;
-    setLoading(true);
+    const requestId = ++questionRequestSequence.current;
+    const key = questionCacheKey(page, subjectId, topicId, language, search, sort);
+    const cached = readClientCache<QuestionPageData>(key, 60 * 1000, 10 * 60 * 1000);
+
+    // Render previously loaded results immediately; refresh them in the background.
+    if (cached) {
+      setQuestions(cached.data.questions);
+      setTotal(cached.data.total);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     setError("");
     setNotice("");
+    if (cached?.isFresh) return;
+
     try {
       const params = new URLSearchParams({
         page: String(page),
@@ -133,15 +207,33 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
         ...question,
         question_options: [...(question.question_options ?? [])].sort((a, b) => a.option_order - b.option_order),
       }));
-      setQuestions(normalized);
-      setTotal(result.total ?? 0);
+      const data = { questions: normalized, total: result.total ?? 0 };
+      writeClientCache(key, data);
+      if (requestId !== questionRequestSequence.current) return;
+      setQuestions(data.questions);
+      setTotal(data.total);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Questions could not be loaded.");
-      setQuestions([]);
-      setTotal(0);
+      if (requestId !== questionRequestSequence.current) return;
+      setError(cached
+        ? "Showing previously loaded questions because the refresh failed."
+        : caught instanceof Error ? caught.message : "Questions could not be loaded.");
+      if (!cached) {
+        setQuestions([]);
+        setTotal(0);
+      }
+    } finally {
+      if (requestId === questionRequestSequence.current) setLoading(false);
     }
-    setLoading(false);
   }, [supabase, page, subjectId, topicId, language, search, sort]);
+
+  useEffect(() => {
+    function handleRouteRevalidate(event: Event) {
+      const detail = (event as CustomEvent<{ pathname?: string }>).detail;
+      if (detail?.pathname === "/questions") void loadQuestions();
+    }
+    window.addEventListener("careerotic:route-revalidate", handleRouteRevalidate);
+    return () => window.removeEventListener("careerotic:route-revalidate", handleRouteRevalidate);
+  }, [loadQuestions]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -165,9 +257,23 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     let active = true;
 
     async function preloadAnswers() {
-      const missing = questions.filter(
-        (question) => !answers[question.id] && !preloadInFlight.current.has(question.id),
-      );
+      const cachedAnswers = questions.flatMap((question) => {
+        if (answers[question.id]) return [];
+        const cached = readClientCache<Answer>(`public:answer:${question.id}`, 2 * 60 * 1000, 10 * 60 * 1000);
+        return cached ? [[question.id, cached.data] as const] : [];
+      });
+      if (cachedAnswers.length) {
+        setAnswers((current) => {
+          const next = { ...current };
+          cachedAnswers.forEach(([id, answer]) => { if (!next[id]) next[id] = answer; });
+          return next;
+        });
+      }
+
+      const missing = questions.filter((question) => {
+        const cached = readClientCache<Answer>(`public:answer:${question.id}`, 2 * 60 * 1000, 10 * 60 * 1000);
+        return (!cached || !cached.isFresh) && !preloadInFlight.current.has(question.id);
+      });
       for (let index = 0; index < missing.length; index += 5) {
         const batch = missing.slice(index, index + 5);
         batch.forEach((question) => preloadInFlight.current.add(question.id));
@@ -184,6 +290,7 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
         if (!active) return;
         const results = batch.map((question) => {
           const parsed = answerFromJson(payload?.answers?.[question.id]);
+          if (parsed) writeClientCache(`public:answer:${question.id}`, parsed);
           return parsed ? [question.id, parsed] as const : null;
         });
         if (results.some((result) => result !== null)) {
@@ -221,6 +328,70 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     return () => { active = false; };
   }, [questions, supabase]);
 
+  // Complete a guest's pending save after sign-in. Use getSession (which
+  // safely returns a null session for guests) and auth-state events instead of
+  // getUser, which throws "Auth session missing!" when no session is present.
+  useEffect(() => {
+    const client = supabase;
+    if (!client) return;
+    const authClient = client as NonNullable<typeof client>;
+    const pendingUrl = new URL(window.location.href);
+    const pendingQuestionId = pendingUrl.searchParams.get("saveQuestion");
+    if (!pendingQuestionId) return;
+    const questionId = pendingQuestionId;
+
+    let active = true;
+    let saving = false;
+    let saved = false;
+
+    async function savePendingBookmark(userId: string) {
+      if (!active || saving || saved) return;
+      saving = true;
+      try {
+        const { error: saveError } = await authClient
+          .from("question_bookmarks")
+          .upsert(
+            { question_id: questionId, user_id: userId },
+            { onConflict: "user_id,question_id", ignoreDuplicates: true },
+          );
+        if (!active) return;
+        if (saveError) throw saveError;
+
+        saved = true;
+        clearClientCache(`private:${userId}:saved-questions`);
+        setBookmarks((current) => ({ ...current, [questionId]: true }));
+        setNotice("Question saved successfully.");
+        setError("");
+        pendingUrl.searchParams.delete("saveQuestion");
+        window.history.replaceState({}, "", pendingUrl.pathname + pendingUrl.search + pendingUrl.hash);
+      } catch (caught) {
+        if (active) setError(getErrorMessage(caught));
+      } finally {
+        saving = false;
+      }
+    }
+
+    const { data: authListener } = authClient.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) void savePendingBookmark(session.user.id);
+    });
+
+    void authClient.auth.getSession().then(({ data, error: sessionError }) => {
+      if (!active) return;
+      if (sessionError) {
+        setError("Unable to verify your login. Please try again.");
+        return;
+      }
+      if (data.session?.user) void savePendingBookmark(data.session.user.id);
+      // No session is a normal guest state; wait for sign-in without showing
+      // an auth error or removing the pending question from the URL.
+    });
+
+    return () => {
+      active = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, [supabase]);
+
   // Reset pagination in filter handlers, not on mount, so URL page=N survives initial render.
 
   async function toggleAnswer(question: Question) {
@@ -229,6 +400,13 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
       return;
     }
     if (answers[question.id]) {
+      setAnswerErrors((current) => ({ ...current, [question.id]: "" }));
+      setOpenAnswers((current) => ({ ...current, [question.id]: true }));
+      return;
+    }
+    const cachedAnswer = readClientCache<Answer>(`public:answer:${question.id}`, 2 * 60 * 1000, 10 * 60 * 1000);
+    if (cachedAnswer) {
+      setAnswers((current) => ({ ...current, [question.id]: cachedAnswer.data }));
       setAnswerErrors((current) => ({ ...current, [question.id]: "" }));
       setOpenAnswers((current) => ({ ...current, [question.id]: true }));
       return;
@@ -243,6 +421,7 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
       const payload = await response.json() as { answers?: Record<string, unknown> };
       const answer = answerFromJson(payload.answers?.[question.id]);
       if (!answer?.correct_option) throw new Error("The answer is not available for this question.");
+      writeClientCache(`public:answer:${question.id}`, answer);
       setAnswers((current) => ({ ...current, [question.id]: answer }));
       setOpenAnswers((current) => ({ ...current, [question.id]: true }));
     } catch (caught) {
@@ -260,23 +439,20 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     setError("");
     setNotice("");
     const { data: userResult, error: authError } = await supabase.auth.getUser();
-    if (authError) {
-      setError("Unable to verify your sign-in status. Please try again.");
-      return;
-    }
-    if (!userResult.user) {
-      window.alert("Please sign in to save this question. You will return to the question bank after signing in.");
-      const next = window.location.pathname + window.location.search + window.location.hash;
-      window.location.assign("/login?next=" + encodeURIComponent(next));
+    if (authError || !userResult.user) {
+      // Keep guests on the current page until they explicitly choose to sign in.
+      setLoginPromptQuestion(question);
       return;
     }
     if (bookmarks[question.id]) {
       const { error: deleteError } = await supabase.from("question_bookmarks").delete().eq("question_id", question.id).eq("user_id", userResult.user.id);
       if (deleteError) { setError(deleteError.message); return; }
+      clearClientCache(`private:${userResult.user.id}:saved-questions`);
       setBookmarks((current) => ({ ...current, [question.id]: false }));
     } else {
       const { error: insertError } = await supabase.from("question_bookmarks").insert({ question_id: question.id, user_id: userResult.user.id });
       if (insertError) { setError(insertError.message); return; }
+      clearClientCache(`private:${userResult.user.id}:saved-questions`);
       setBookmarks((current) => ({ ...current, [question.id]: true }));
     }
   }
@@ -382,6 +558,28 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
           </div>
         </nav>
       </div>
+
+      {loginPromptQuestion && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setLoginPromptQuestion(null); }}>
+        <section role="dialog" aria-modal="true" aria-labelledby="save-login-title" aria-describedby="save-login-description" className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-2xl">
+          <h2 id="save-login-title" className="text-lg font-semibold text-slate-900">Log in to save this question?</h2>
+          <p id="save-login-description" className="mt-2 text-sm leading-6 text-slate-600">You need an account to save questions. You can keep browsing, or log in now and we’ll save this question for you.</p>
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => setLoginPromptQuestion(null)} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">Cancel</button>
+            <button type="button" onClick={() => {
+              const currentUrl = new URL(window.location.href);
+              currentUrl.searchParams.set("saveQuestion", loginPromptQuestion.id);
+              const next = currentUrl.pathname + currentUrl.search + currentUrl.hash;
+              window.location.assign("/signup?next=" + encodeURIComponent(next));
+            }} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">Create account</button>
+            <button type="button" onClick={() => {
+              const currentUrl = new URL(window.location.href);
+              currentUrl.searchParams.set("saveQuestion", loginPromptQuestion.id);
+              const next = currentUrl.pathname + currentUrl.search + currentUrl.hash;
+              window.location.assign("/login?next=" + encodeURIComponent(next));
+            }} className="rounded-md bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">Login</button>
+          </div>
+        </section>
+      </div>}
 
       {reportQuestion && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !reportBusy) setReportQuestion(null); }}>
         <section role="dialog" aria-modal="true" aria-labelledby="report-title" className="w-full max-w-md rounded-xl bg-white p-4 shadow-xl">

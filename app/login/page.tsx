@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import type { FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,8 +23,17 @@ function LoginForm() {
       const supabase = createClient();
       const { error: authError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (authError) throw authError;
-      router.replace(destination);
-      router.refresh();
+
+      // Confirm the browser client has a persisted session before navigating.
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!sessionData.session) {
+        throw new Error("Login succeeded but your session was not established. Please try signing in again.");
+      }
+
+      // A full navigation ensures the next page initializes from the persisted
+      // Supabase session rather than racing the client-side route transition.
+      window.location.replace(destination);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to sign in. Please try again.");
     } finally { setBusy(false); }
