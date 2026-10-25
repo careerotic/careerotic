@@ -23,6 +23,7 @@ function todayLocalDate() {
 export default function AccountPage() {
   const [profile, setProfile] = useState<AccountForm>({ fullName: "", email: "", phoneNumber: "", dateOfBirth: "" });
   const [loading, setLoading] = useState(true);
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -35,8 +36,12 @@ export default function AccountPage() {
         const supabase = createClient();
         const { data, error: userError } = await supabase.auth.getUser();
         if (userError) throw userError;
-        if (!data.user) throw new Error("Your session has expired. Please sign in again.");
+        if (!data.user) {
+          if (active) setSignedIn(false);
+          return;
+        }
         if (!active) return;
+        setSignedIn(true);
         setProfile({
           fullName: typeof data.user.user_metadata?.full_name === "string" ? data.user.user_metadata.full_name : "",
           email: data.user.email ?? "",
@@ -95,6 +100,36 @@ export default function AccountPage() {
 
   const field = "w-full rounded-lg border border-slate-300 px-3.5 py-3 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 disabled:bg-slate-100 disabled:text-slate-600";
   const label = "mb-1.5 block text-sm font-medium text-slate-700";
+
+  if (!loading && signedIn === false) {
+    return (
+      <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-900">
+        <div className="mx-auto max-w-2xl">
+          <header className="flex items-center justify-between">
+            <Link href="/" className="text-lg font-bold text-indigo-700">Careerotic</Link>
+            <Link href="/questions" className="text-sm font-semibold text-indigo-700 hover:underline">Browse questions →</Link>
+          </header>
+          <section className="mt-7 rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-10">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-700" aria-hidden="true">
+              <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.7">
+                <circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" />
+              </svg>
+            </div>
+            <p className="mt-5 text-sm font-semibold uppercase tracking-wide text-indigo-700">Your account</p>
+            <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">Sign in when you’re ready</h1>
+            <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-600">
+              You can keep exploring Careerotic as a guest. Sign in or create an account when you want to manage your profile and personal study activity.
+            </p>
+            <div className="mx-auto mt-6 flex max-w-sm flex-col gap-3 sm:flex-row">
+              <Link href="/login?next=%2Faccount" className="inline-flex flex-1 items-center justify-center rounded-lg bg-indigo-700 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">Login</Link>
+              <Link href="/signup?next=%2Faccount" className="inline-flex flex-1 items-center justify-center rounded-lg border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">Create account</Link>
+            </div>
+            <p className="mt-4 text-xs text-slate-500">No login is needed to browse public questions and exams.</p>
+          </section>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-900">
