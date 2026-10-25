@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import QuestionBankCard from "@/components/questions/QuestionBankCard";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { readClientCache, writeClientCache } from "@/lib/cache/client-memory";
 
 type Option = { id: string; question_id: string; option_text: string; option_order: number };
 type Question = {
@@ -17,6 +18,12 @@ type Question = {
 };
 type Answer = { question_id?: string; explanation?: string | null; options?: { id?: string; option_id?: string; option_text?: string; text?: string; option_order?: number }[]; correct_option?: { id?: string; option_id?: string; option_text?: string; text?: string } | null };
 type ReportReason = "incorrect_answer" | "incorrect_question" | "unclear_explanation" | "other";
+
+type QuestionPageData = { questions: Question[]; total: number };
+
+function questionCacheKey(page: number, subjectId: string, topicId: string, language: string, search: string, sort: string) {
+  return `public:questions:${new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE), subjectId, topicId, language, search, sort }).toString()}`;
+}
 
 const PAGE_SIZE = 25;
 const inputClass = "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100";
@@ -41,6 +48,7 @@ function answerFromJson(value: unknown): Answer | null {
 export default function QuestionsClient({ initialQuestions, initialLoadFailed = false, initialPage = 1, initialTotal = 0 }: { initialQuestions: Question[]; initialLoadFailed?: boolean; initialPage?: number; initialTotal?: number }) {
   const [supabase, setSupabase] = useState<ReturnType<typeof createClient> | null>(null);
   const skipInitialQuestionFetch = useRef(true);
+  const questionRequestSequence = useRef(0);
 
   useEffect(() => {
     try {
@@ -78,6 +86,13 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   useEffect(() => {
+    writeClientCache<QuestionPageData>(
+      questionCacheKey(initialPage, "all", "all", "all", "", "newest"),
+      { questions: initialQuestions, total: initialTotal },
+    );
+  }, [initialQuestions, initialPage, initialTotal]);
+
+  useEffect(() => {
     const timer = window.setTimeout(() => {
       setSearch(searchInput.trim());
     }, 250);
@@ -89,6 +104,15 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     if (!client) return;
     let active = true;
     async function loadTaxonomy() {
+      const cached = readClientCache<{
+        subjects: { id: string; name: string; slug: string }[];
+        topics: { id: string; name: string; subject_id: string }[];
+      }>("public:taxonomy", 5 * 60 * 1000, 30 * 60 * 1000);
+      if (cached) {
+        setSubjects(cached.data.subjects.map(({ id, name }) => ({ id, name })));
+        setTopics(cached.data.topics);
+      }
+
       try {
         const response = await fetch("/api/public/taxonomy");
         if (!response.ok) throw new Error("Unable to load filters.");
@@ -97,10 +121,11 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
           topics: { id: string; name: string; subject_id: string }[];
         };
         if (!active) return;
+        writeClientCache("public:taxonomy", payload);
         setSubjects(payload.subjects.map(({ id, name }) => ({ id, name })));
         setTopics(payload.topics);
       } catch {
-        if (active) setError("Unable to load filters.");
+        if (active && !cached) setError("Unable to load filters.");
       }
     }
     void loadTaxonomy();
@@ -114,9 +139,21 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
 
   const loadQuestions = useCallback(async () => {
     if (!supabase) return;
-    setLoading(true);
+    const requestId = ++questionRequestSequence.current;
+    const key = questionCacheKey(page, subjectId, topicId, language, search, sort);
+    const cached = readClientCache<QuestionPageData>(key, 60 * 1000, 10 * 60 * 1000);
+
+    // Render previously loaded results immediately; refresh them in the background.
+    if (cached) {
+      setQuestions(cached.data.questions);
+      setTotal(cached.data.total);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     setError("");
     setNotice("");
+
     try {
       const params = new URLSearchParams({
         page: String(page),
@@ -134,14 +171,23 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
         ...question,
         question_options: [...(question.question_options ?? [])].sort((a, b) => a.option_order - b.option_order),
       }));
-      setQuestions(normalized);
-      setTotal(result.total ?? 0);
+      const data = { questions: normalized, total: result.total ?? 0 };
+      writeClientCache(key, data);
+      if (requestId !== questionRequestSequence.current) return;
+      setQuestions(data.questions);
+      setTotal(data.total);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Questions could not be loaded.");
-      setQuestions([]);
-      setTotal(0);
+      if (requestId !== questionRequestSequence.current) return;
+      setError(cached
+        ? "Showing previously loaded questions because the refresh failed."
+        : caught instanceof Error ? caught.message : "Questions could not be loaded.");
+      if (!cached) {
+        setQuestions([]);
+        setTotal(0);
+      }
+    } finally {
+      if (requestId === questionRequestSequence.current) setLoading(false);
     }
-    setLoading(false);
   }, [supabase, page, subjectId, topicId, language, search, sort]);
 
   useEffect(() => {
