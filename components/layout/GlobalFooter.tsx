@@ -21,13 +21,14 @@ const footerGroups = [
     ],
   },
   {
-    title: "Support",
+    title: "Support & policies",
     links: [
       { href: "/help", label: "Help & FAQ" },
       { href: "/about", label: "About Careerotic" },
       { href: "/contact", label: "Contact & support" },
       { href: "/disclaimer", label: "Educational disclaimer" },
       { href: "/privacy", label: "Privacy policy" },
+      { href: "/cookies", label: "Cookie policy" },
       { href: "/terms", label: "Terms of use" },
     ],
   },
@@ -40,15 +41,9 @@ export default function GlobalFooter() {
       <div className="app-page-gutter mx-auto w-full max-w-[1760px] py-5 sm:py-7">
         <div className="grid grid-cols-3 gap-x-4 gap-y-5 sm:gap-y-6 lg:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))] lg:gap-10">
           <div className="col-span-3 min-w-0 lg:col-span-1">
-            <Link
-              href="/"
-              aria-label="Careerotic home"
-              className="inline-flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-            >
+            <Link href="/" aria-label="Careerotic home" className="inline-flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
               <Image src="/brand/careerotic-mark.svg" alt="" width={36} height={36} className="h-9 w-9" />
-              <span className="text-xl font-extrabold tracking-tight text-slate-900">
-                Career<span className="text-blue-600">otic</span>
-              </span>
+              <span className="text-xl font-extrabold tracking-tight text-slate-900">Career<span className="text-blue-600">otic</span></span>
             </Link>
             <p className="mt-2 max-w-sm text-sm leading-6 text-slate-600">
               Build confidence for competitive exams with subject-wise practice, clear explanations, and published exam preparation.
@@ -61,10 +56,7 @@ export default function GlobalFooter() {
               <ul className="mt-2 space-y-2">
                 {group.links.map((link) => (
                   <li key={link.href}>
-                    <Link
-                      href={link.href}
-                      className="inline-flex max-w-full rounded text-sm leading-5 text-slate-600 transition-colors hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-                    >
+                    <Link href={link.href} className="inline-flex max-w-full rounded text-sm leading-5 text-slate-600 transition-colors hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
                       {link.label}
                     </Link>
                   </li>
