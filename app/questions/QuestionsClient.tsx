@@ -230,25 +230,27 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     const pendingUrl = new URL(window.location.href);
     const pendingQuestionId = pendingUrl.searchParams.get("saveQuestion");
     if (!pendingQuestionId) return;
+    const questionId: string = pendingQuestionId;
+    const bookmarkClient = client as NonNullable<typeof client>;
 
     let active = true;
     async function savePendingBookmark() {
       try {
-        const { data: userResult, error: authError } = await client.auth.getUser();
+        const { data: userResult, error: authError } = await bookmarkClient.auth.getUser();
         if (!active) return;
         if (authError) throw authError;
         if (!userResult.user) return;
 
-        const { error: saveError } = await client
+        const { error: saveError } = await bookmarkClient
           .from("question_bookmarks")
           .upsert(
-            { question_id: pendingQuestionId, user_id: userResult.user.id },
+            { question_id: questionId, user_id: userResult.user.id },
             { onConflict: "user_id,question_id", ignoreDuplicates: true },
           );
         if (!active) return;
         if (saveError) throw saveError;
 
-        setBookmarks((current) => ({ ...current, [pendingQuestionId]: true }));
+        setBookmarks((current) => ({ ...current, [questionId]: true }));
         setNotice("Question saved successfully.");
         pendingUrl.searchParams.delete("saveQuestion");
         window.history.replaceState({}, "", pendingUrl.pathname + pendingUrl.search + pendingUrl.hash);
