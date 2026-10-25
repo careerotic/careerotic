@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import QuestionBankCard from "@/components/questions/QuestionBankCard";
+import QuestionBankPagination from "@/components/questions/QuestionBankPagination";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { clearClientCache, readClientCache, writeClientCache } from "@/lib/cache/client-memory";
 
@@ -549,14 +550,7 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
               />
             ))}</div>}
 
-        <nav aria-label="Question pagination" className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3">
-          <p className="text-sm text-slate-500">Page {page} of {totalPages} · 25 per page</p>
-          <div className="flex items-center gap-2">
-            {page > 1 ? <a href={page === 2 ? "/questions" : `/questions?page=${page - 1}`} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Previous</a> : <span aria-disabled="true" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm opacity-40">Previous</span>}
-            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => Math.max(1, Math.min(page - 2, totalPages - 4)) + i).map((number) => <a key={number} href={number === 1 ? "/questions" : `/questions?page=${number}`} aria-current={number === page ? "page" : undefined} className={`rounded-md border px-3 py-2 text-sm font-medium ${number === page ? "border-indigo-600 bg-indigo-50 text-indigo-800" : "border-slate-300 bg-white text-slate-700"}`}>{number}</a>)}
-            {page < totalPages ? <a href={`/questions?page=${page + 1}`} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Next</a> : <span aria-disabled="true" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm opacity-40">Next</span>}
-          </div>
-        </nav>
+        <QuestionBankPagination baseHref="/questions" page={page} totalPages={totalPages} pageSize={PAGE_SIZE} />
       </div>
 
       {loginPromptQuestion && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setLoginPromptQuestion(null); }}>
