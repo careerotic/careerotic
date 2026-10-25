@@ -228,6 +228,7 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
   useEffect(() => {
     const client = supabase;
     if (!client) return;
+    const authClient = client as NonNullable<typeof client>;
     const pendingUrl = new URL(window.location.href);
     const pendingQuestionId = pendingUrl.searchParams.get("saveQuestion");
     if (!pendingQuestionId) return;
@@ -241,7 +242,7 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
       if (!active || saving || saved) return;
       saving = true;
       try {
-        const { error: saveError } = await client
+        const { error: saveError } = await authClient
           .from("question_bookmarks")
           .upsert(
             { question_id: questionId, user_id: userId },
@@ -263,11 +264,11 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
       }
     }
 
-    const { data: authListener } = client.auth.onAuthStateChange((_event, session) => {
+    const { data: authListener } = authClient.auth.onAuthStateChange((_event, session) => {
       if (session?.user) void savePendingBookmark(session.user.id);
     });
 
-    void client.auth.getSession().then(({ data, error: sessionError }) => {
+    void authClient.auth.getSession().then(({ data, error: sessionError }) => {
       if (!active) return;
       if (sessionError) {
         setError("Unable to verify your login. Please try again.");
