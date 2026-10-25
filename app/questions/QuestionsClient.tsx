@@ -421,7 +421,7 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
         </nav>
       </div>
 
-      {loginPromptQuestion && <div className="fixed inset-50 z-[60] flex items-center justify-center bg-slate-950/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setLoginPromptQuestion(null); }}>
+      {loginPromptQuestion && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setLoginPromptQuestion(null); }}>
         <section role="dialog" aria-modal="true" aria-labelledby="save-login-title" aria-describedby="save-login-description" className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-2xl">
           <h2 id="save-login-title" className="text-lg font-semibold text-slate-900">Log in to save this question?</h2>
           <p id="save-login-description" className="mt-2 text-sm leading-6 text-slate-600">You need to log in to save questions to your account. Would you like to log in now?</p>
