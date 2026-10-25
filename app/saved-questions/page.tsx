@@ -90,6 +90,12 @@ export default function SavedQuestionsPage() {
       }
     }
 
+    function handleRouteRevalidate(event: Event) {
+      const detail = (event as CustomEvent<{ pathname?: string }>).detail;
+      if (detail?.pathname === "/saved-questions") void loadSavedQuestions();
+    }
+    window.addEventListener("careerotic:route-revalidate", handleRouteRevalidate);
+
     const { data: authListener } = db.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT" || !session?.user) {
         requestSequence += 1;
@@ -111,6 +117,7 @@ export default function SavedQuestionsPage() {
     void loadSavedQuestions();
     return () => {
       active = false;
+      window.removeEventListener("careerotic:route-revalidate", handleRouteRevalidate);
       authListener.subscription.unsubscribe();
     };
   }, []);
