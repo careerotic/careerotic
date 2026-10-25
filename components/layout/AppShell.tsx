@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { clearPrivateClientCache } from "@/lib/cache/client-memory";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Breadcrumbs from "./Breadcrumbs";
 import GlobalFooter from "./GlobalFooter";
 import GlobalHeader, { type HeaderUser } from "./GlobalHeader";
@@ -13,11 +13,14 @@ import RightNavigation from "./RightNavigation";
 
 type Props = { children: React.ReactNode; initialUser: HeaderUser | null };
 const authenticationRoutes = ["/login", "/signup", "/forgot-password", "/reset-password"];
+const ROUTE_REFRESH_AFTER_MS = 30_000;
+const routeVisitedAt = new Map<string, number>();
 
 export default function AppShell({ children, initialUser }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPathname, setMenuPathname] = useState("");
   const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
     let active = true;
@@ -50,6 +53,38 @@ export default function AppShell({ children, initialUser }: Props) {
       authListener.subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    const isAuthenticationOrAdminRoute =
+      pathname === "/admin" ||
+      pathname.startsWith("/admin/") ||
+      authenticationRoutes.includes(pathname) ||
+      pathname.startsWith("/auth/");
+    const isExamAttempt =
+      pathname.startsWith("/attempt/") ||
+      (pathname.startsWith("/exam/") && (pathname.endsWith("/attempt") || pathname.includes("/attempt/")));
+
+    // Do not refresh authentication flows, admin screens, or an in-progress exam attempt.
+    if (isAuthenticationOrAdminRoute || isExamAttempt) return;
+
+    const now = Date.now();
+    const lastVisitedAt = routeVisitedAt.get(pathname);
+    routeVisitedAt.delete(pathname);
+    routeVisitedAt.set(pathname, now);
+
+    // Bound the per-tab route history to avoid unbounded memory growth.
+    while (routeVisitedAt.size > 50) {
+      const oldestPath = routeVisitedAt.keys().next().value;
+      if (oldestPath === undefined) break;
+      routeVisitedAt.delete(oldestPath);
+    }
+
+    // The Router Cache renders the previous route immediately; refresh the RSC payload
+    // in the background when the page has not been visited recently.
+    if (lastVisitedAt !== undefined && now - lastVisitedAt > ROUTE_REFRESH_AFTER_MS) {
+      router.refresh();
+    }
+  }, [pathname, router]);
 
   const drawerOpen = menuOpen && menuPathname === pathname;
   const closeMenu = useCallback(() => setMenuOpen(false), []);
