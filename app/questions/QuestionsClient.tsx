@@ -226,28 +226,30 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
   useEffect(() => {
     const client = supabase;
     if (!client) return;
+    const bookmarkClient = client as NonNullable<typeof client>;
     const url = new URL(window.location.href);
     const pendingQuestionId = url.searchParams.get("saveQuestion");
     if (!pendingQuestionId) return;
+    const questionId: string = pendingQuestionId;
 
     let active = true;
     async function savePendingBookmark() {
       try {
-        const { data: userResult, error: authError } = await client.auth.getUser();
+        const { data: userResult, error: authError } = await bookmarkClient.auth.getUser();
         if (!active) return;
         if (authError) throw authError;
         if (!userResult.user) return;
 
-        const { error: saveError } = await client
+        const { error: saveError } = await bookmarkClient
           .from("question_bookmarks")
           .upsert(
-            { question_id: pendingQuestionId, user_id: userResult.user.id },
+            { question_id: questionId, user_id: userResult.user.id },
             { onConflict: "user_id,question_id", ignoreDuplicates: true },
           );
         if (!active) return;
         if (saveError) throw saveError;
 
-        setBookmarks((current) => ({ ...current, [pendingQuestionId]: true }));
+        setBookmarks((current) => ({ ...current, [questionId]: true }));
         setNotice("Question saved successfully.");
         url.searchParams.delete("saveQuestion");
         window.history.replaceState({}, "", url.pathname + url.search + url.hash);
