@@ -111,6 +111,7 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
       if (cached) {
         setSubjects(cached.data.subjects.map(({ id, name }) => ({ id, name })));
         setTopics(cached.data.topics);
+        if (cached.isFresh) return;
       }
 
       try {
@@ -153,6 +154,7 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     }
     setError("");
     setNotice("");
+    if (cached?.isFresh) return;
 
     try {
       const params = new URLSearchParams({
@@ -225,11 +227,10 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
         });
       }
 
-      const missing = questions.filter(
-        (question) => !answers[question.id]
-          && !readClientCache<Answer>(`public:answer:${question.id}`, 2 * 60 * 1000, 10 * 60 * 1000)
-          && !preloadInFlight.current.has(question.id),
-      );
+      const missing = questions.filter((question) => {
+        const cached = readClientCache<Answer>(`public:answer:${question.id}`, 2 * 60 * 1000, 10 * 60 * 1000);
+        return (!cached || !cached.isFresh) && !preloadInFlight.current.has(question.id);
+      });
       for (let index = 0; index < missing.length; index += 5) {
         const batch = missing.slice(index, index + 5);
         batch.forEach((question) => preloadInFlight.current.add(question.id));
