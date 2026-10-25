@@ -222,45 +222,66 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     return () => { active = false; };
   }, [questions, supabase]);
 
-  // Complete a guest's pending save after sign-in. The question ID is carried
-  // through the existing safe "next" redirect; upsert keeps retries idempotent.
+  // Complete a guest's pending save after sign-in. Use getSession (which
+  // safely returns a null session for guests) and auth-state events instead of
+  // getUser, which throws "Auth session missing!" when no session is present.
   useEffect(() => {
     const client = supabase;
     if (!client) return;
     const pendingUrl = new URL(window.location.href);
     const pendingQuestionId = pendingUrl.searchParams.get("saveQuestion");
     if (!pendingQuestionId) return;
-    const questionId: string = pendingQuestionId;
-    const bookmarkClient = client as NonNullable<typeof client>;
+    const questionId = pendingQuestionId;
 
     let active = true;
-    async function savePendingBookmark() {
-      try {
-        const { data: userResult, error: authError } = await bookmarkClient.auth.getUser();
-        if (!active) return;
-        if (authError) throw authError;
-        if (!userResult.user) return;
+    let saving = false;
+    let saved = false;
 
-        const { error: saveError } = await bookmarkClient
+    async function savePendingBookmark(userId: string) {
+      if (!active || saving || saved) return;
+      saving = true;
+      try {
+        const { error: saveError } = await client
           .from("question_bookmarks")
           .upsert(
-            { question_id: questionId, user_id: userResult.user.id },
+            { question_id: questionId, user_id: userId },
             { onConflict: "user_id,question_id", ignoreDuplicates: true },
           );
         if (!active) return;
         if (saveError) throw saveError;
 
+        saved = true;
         setBookmarks((current) => ({ ...current, [questionId]: true }));
         setNotice("Question saved successfully.");
+        setError("");
         pendingUrl.searchParams.delete("saveQuestion");
         window.history.replaceState({}, "", pendingUrl.pathname + pendingUrl.search + pendingUrl.hash);
       } catch (caught) {
         if (active) setError(getErrorMessage(caught));
+      } finally {
+        saving = false;
       }
     }
 
-    void savePendingBookmark();
-    return () => { active = false; };
+    const { data: authListener } = client.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) void savePendingBookmark(session.user.id);
+    });
+
+    void client.auth.getSession().then(({ data, error: sessionError }) => {
+      if (!active) return;
+      if (sessionError) {
+        setError("Unable to verify your login. Please try again.");
+        return;
+      }
+      if (data.session?.user) void savePendingBookmark(data.session.user.id);
+      // No session is a normal guest state; wait for sign-in without showing
+      // an auth error or removing the pending question from the URL.
+    });
+
+    return () => {
+      active = false;
+      authListener.subscription.unsubscribe();
+    };
   }, [supabase]);
 
   // Reset pagination in filter handlers, not on mount, so URL page=N survives initial render.
