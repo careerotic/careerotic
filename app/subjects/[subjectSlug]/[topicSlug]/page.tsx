@@ -34,7 +34,7 @@ export async function generateMetadata({ params }: RouteProps): Promise<Metadata
 export default async function TopicPage({ params, searchParams }: RouteProps) {
   const [{ subjectSlug, topicSlug }, query] = await Promise.all([params, searchParams]);
   const rawPage = query.page ?? "1";
-  if (!/^[1-9]\\d*$/.test(rawPage)) notFound();
+  if (!/^[1-9]\d*$/.test(rawPage)) notFound();
   const page = Number(rawPage);
   if (!Number.isSafeInteger(page)) notFound();
   let subject: { id: string; name: string; slug: string } | null = null;
