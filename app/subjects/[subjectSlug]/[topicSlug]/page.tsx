@@ -84,7 +84,7 @@ export default async function TopicPage({ params, searchParams }: RouteProps) {
           <Link href={`/subjects/${subject.slug}`} className="mt-3 inline-flex text-sm font-semibold text-indigo-700 hover:underline">Back to {subject.name}</Link>
         </section>
       ) : (
-        <TopicQuestionList questions={questions} />
+        <TopicQuestionList questions={questions} subject={subject.name} topic={topic.name} />
       )}
 
       {totalPages > 1 && (
