@@ -446,8 +446,14 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
         <section role="dialog" aria-modal="true" aria-labelledby="save-login-title" aria-describedby="save-login-description" className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-2xl">
           <h2 id="save-login-title" className="text-lg font-semibold text-slate-900">Log in to save this question?</h2>
           <p id="save-login-description" className="mt-2 text-sm leading-6 text-slate-600">You need an account to save questions. You can keep browsing, or log in now and we’ll save this question for you.</p>
-          <div className="mt-5 flex justify-end gap-2">
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button type="button" onClick={() => setLoginPromptQuestion(null)} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">Cancel</button>
+            <button type="button" onClick={() => {
+              const currentUrl = new URL(window.location.href);
+              currentUrl.searchParams.set("saveQuestion", loginPromptQuestion.id);
+              const next = currentUrl.pathname + currentUrl.search + currentUrl.hash;
+              window.location.assign("/signup?next=" + encodeURIComponent(next));
+            }} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">Create account</button>
             <button type="button" onClick={() => {
               const currentUrl = new URL(window.location.href);
               currentUrl.searchParams.set("saveQuestion", loginPromptQuestion.id);
