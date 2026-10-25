@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { clearClientCache, readClientCache, writeClientCache } from "@/lib/cache/client-memory";
 import QuestionBankCard, { type QuestionBankAnswer } from "@/components/questions/QuestionBankCard";
@@ -58,6 +58,65 @@ export default function TopicQuestionList({
       setError(errorMessage(caught));
     }
   }, []);
+
+  const preloadInFlight = useRef(new Set<string>());
+
+  // Match /questions: hydrate fresh cached answers immediately, then preload
+  // missing/stale answers in small batches so "Show answer" is instant when possible.
+  useEffect(() => {
+    if (!supabase || questions.length === 0) return;
+    let active = true;
+
+    async function preloadAnswers() {
+      const cachedAnswers = questions.flatMap((question) => {
+        if (answers[question.id]) return [];
+        const cached = readClientCache<AnswerPayload>(`public:answer:${question.id}`, 2 * 60 * 1000, 10 * 60 * 1000);
+        return cached ? [[question.id, cached.data] as const] : [];
+      });
+      if (cachedAnswers.length) {
+        setAnswers((current) => {
+          const next = { ...current };
+          cachedAnswers.forEach(([id, answer]) => { if (!next[id]) next[id] = answer; });
+          return next;
+        });
+      }
+
+      const missing = questions.filter((question) => {
+        const cached = readClientCache<AnswerPayload>(`public:answer:${question.id}`, 2 * 60 * 1000, 10 * 60 * 1000);
+        return (!cached || !cached.isFresh) && !preloadInFlight.current.has(question.id);
+      });
+      for (let index = 0; index < missing.length; index += 5) {
+        const batch = missing.slice(index, index + 5);
+        batch.forEach((question) => preloadInFlight.current.add(question.id));
+        let payload: { answers?: Record<string, unknown> } | null = null;
+        try {
+          const response = await fetch("/api/questions/answers?ids=" + encodeURIComponent(batch.map((question) => question.id).join(",")));
+          if (response.ok) payload = await response.json() as { answers?: Record<string, unknown> };
+        } catch {
+          // Best effort; opening an answer retries on demand.
+        } finally {
+          batch.forEach((question) => preloadInFlight.current.delete(question.id));
+        }
+
+        if (!active) return;
+        const results = batch.map((question) => {
+          const parsed = parseAnswer(payload?.answers?.[question.id]);
+          if (parsed) writeClientCache(`public:answer:${question.id}`, parsed);
+          return parsed ? [question.id, parsed] as const : null;
+        });
+        if (results.some((result) => result !== null)) {
+          setAnswers((current) => {
+            const next = { ...current };
+            results.forEach((result) => { if (result) next[result[0]] = result[1]; });
+            return next;
+          });
+        }
+      }
+    }
+
+    void preloadAnswers();
+    return () => { active = false; };
+  }, [questions, supabase, answers]);
 
   useEffect(() => {
     if (!supabase || questions.length === 0) return;
