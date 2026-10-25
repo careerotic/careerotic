@@ -24,6 +24,9 @@ const footerGroups = [
     title: "Support",
     links: [
       { href: "/help", label: "Help & FAQ" },
+      { href: "/about", label: "About Careerotic" },
+      { href: "/contact", label: "Contact & support" },
+      { href: "/disclaimer", label: "Educational disclaimer" },
       { href: "/privacy", label: "Privacy policy" },
       { href: "/terms", label: "Terms of use" },
     ],

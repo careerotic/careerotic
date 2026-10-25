@@ -73,7 +73,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: new URL("/study-guides/math-and-mental-ability", siteUrl).toString(), changeFrequency: "monthly", priority: 0.6 },
     { url: new URL("/study-guides/general-knowledge", siteUrl).toString(), changeFrequency: "monthly", priority: 0.6 },
     { url: new URL("/current-affairs", siteUrl).toString(), changeFrequency: "weekly", priority: 0.6 },
+    { url: new URL("/about", siteUrl).toString(), changeFrequency: "monthly", priority: 0.4 },
     { url: new URL("/help", siteUrl).toString(), changeFrequency: "monthly", priority: 0.4 },
+    { url: new URL("/contact", siteUrl).toString(), changeFrequency: "monthly", priority: 0.3 },
+    { url: new URL("/disclaimer", siteUrl).toString(), changeFrequency: "yearly", priority: 0.3 },
     { url: new URL("/privacy", siteUrl).toString(), changeFrequency: "yearly", priority: 0.3 },
     { url: new URL("/terms", siteUrl).toString(), changeFrequency: "yearly", priority: 0.3 },
   ];
