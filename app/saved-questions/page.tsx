@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { GuestAccessPrompt } from "@/components/auth/GuestAccessPrompt";
+import { clearPrivateClientCache, readClientCache, writeClientCache } from "@/lib/cache/client-memory";
 
 type Saved = {
   question_id: string;
@@ -21,24 +22,43 @@ export default function SavedQuestionsPage() {
   const [rows, setRows] = useState<Saved[]>([]);
   const [loading, setLoading] = useState(true);
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
 
   useEffect(() => {
     let active = true;
+    let requestSequence = 0;
+    let currentUserId: string | null = null;
+    const db = createClient();
 
     async function loadSavedQuestions() {
+      const requestId = ++requestSequence;
       try {
-        const db = createClient();
-
         // A missing session is expected for guests, not an application error.
         const { data: sessionData, error: sessionError } = await db.auth.getSession();
         if (sessionError) throw sessionError;
+        if (!active || requestId !== requestSequence) return;
 
         const user = sessionData.session?.user;
         if (!user) {
-          if (active) setSignedIn(false);
+          currentUserId = null;
+          setUserId(null);
+          setSignedIn(false);
+          setRows([]);
           return;
+        }
+
+        if (currentUserId && currentUserId !== user.id) clearPrivateClientCache();
+        currentUserId = user.id;
+        setUserId(user.id);
+        setSignedIn(true);
+
+        const cacheKey = `private:${user.id}:saved-questions`;
+        const cached = readClientCache<Saved[]>(cacheKey, 30 * 1000, 5 * 60 * 1000);
+        if (cached) {
+          setRows(cached.data);
+          setLoading(false);
         }
 
         const { data, error: queryError } = await db
@@ -48,21 +68,41 @@ export default function SavedQuestionsPage() {
           .order("created_at", { ascending: false });
 
         if (queryError) throw queryError;
-        if (active) {
-          setSignedIn(true);
-          setRows((data ?? []) as unknown as Saved[]);
-        }
+        if (!active || requestId !== requestSequence || currentUserId !== user.id) return;
+        const freshRows = (data ?? []) as unknown as Saved[];
+        writeClientCache(cacheKey, freshRows);
+        setRows(freshRows);
+        setError("");
       } catch (caught) {
-        if (active) {
-          setError(caught instanceof Error ? caught.message : "Saved questions could not be loaded.");
-        }
+        if (!active || requestId !== requestSequence) return;
+        setError(caught instanceof Error ? caught.message : "Saved questions could not be loaded.");
       } finally {
-        if (active) setLoading(false);
+        if (active && requestId === requestSequence) setLoading(false);
       }
     }
 
+    const { data: authListener } = db.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session?.user) {
+        requestSequence += 1;
+        currentUserId = null;
+        clearPrivateClientCache();
+        setUserId(null);
+        setSignedIn(false);
+        setRows([]);
+        setLoading(false);
+        return;
+      }
+      if (session.user.id !== currentUserId) {
+        // Defer auth-triggered work until Supabase finishes its auth callback.
+        window.setTimeout(() => { if (active) void loadSavedQuestions(); }, 0);
+      }
+    });
+
     void loadSavedQuestions();
-    return () => { active = false; };
+    return () => {
+      active = false;
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   async function remove(questionId: string) {
@@ -87,7 +127,9 @@ export default function SavedQuestionsPage() {
         .eq("question_id", questionId);
 
       if (deleteError) throw deleteError;
-      setRows(current => current.filter(row => row.question_id !== questionId));
+      const nextRows = rows.filter(row => row.question_id !== questionId);
+      setRows(nextRows);
+      if (userId) writeClientCache(`private:${userId}:saved-questions`, nextRows);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not remove the saved question.");
     } finally {
