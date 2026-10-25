@@ -11,6 +11,7 @@ export type ClientCacheResult<T> = {
 };
 
 const cache = new Map<string, CacheEntry>();
+let privateCacheUserId: string | null = null;
 const MAX_ENTRIES = 100;
 const DEFAULT_RETAIN_MS = 10 * 60 * 1000;
 
@@ -56,6 +57,21 @@ export function clearClientCache(prefix?: string): void {
   }
 }
 
+export function getPrivateCacheUserId(): string | null {
+  // This cache exists only in the browser; never expose a server-process identity.
+  return typeof window === "undefined" ? null : privateCacheUserId;
+}
+
+export function setPrivateCacheUserId(userId: string | null): void {
+  if (typeof window === "undefined") return;
+  if (privateCacheUserId && userId && privateCacheUserId !== userId) {
+    clearClientCache("private:");
+  }
+  privateCacheUserId = userId;
+  if (!userId) clearClientCache("private:");
+}
+
 export function clearPrivateClientCache(): void {
   clearClientCache("private:");
+  privateCacheUserId = null;
 }
