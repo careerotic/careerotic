@@ -1,5 +1,7 @@
 "use client";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { clearPrivateClientCache } from "@/lib/cache/client-memory";
 import { usePathname } from "next/navigation";
 import Breadcrumbs from "./Breadcrumbs";
 import GlobalFooter from "./GlobalFooter";
@@ -16,6 +18,39 @@ export default function AppShell({ children, initialUser }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPathname, setMenuPathname] = useState("");
   const pathname = usePathname();
+
+  useEffect(() => {
+    let active = true;
+    let currentUserId: string | null = null;
+    let supabase: ReturnType<typeof createClient>;
+    try {
+      supabase = createClient();
+    } catch {
+      return;
+    }
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (active) currentUserId = data.session?.user.id ?? null;
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session?.user) {
+        clearPrivateClientCache();
+        currentUserId = null;
+        return;
+      }
+      if (event === "SIGNED_IN" && currentUserId && currentUserId !== session.user.id) {
+        clearPrivateClientCache();
+      }
+      currentUserId = session.user.id;
+    });
+
+    return () => {
+      active = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
   const drawerOpen = menuOpen && menuPathname === pathname;
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   const toggleMenu = useCallback(() => {
