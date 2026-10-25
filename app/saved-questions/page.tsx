@@ -59,6 +59,7 @@ export default function SavedQuestionsPage() {
         if (cached) {
           setRows(cached.data);
           setLoading(false);
+          if (cached.isFresh) return;
         }
 
         const { data, error: queryError } = await db
@@ -92,7 +93,7 @@ export default function SavedQuestionsPage() {
         setLoading(false);
         return;
       }
-      if (session.user.id !== currentUserId) {
+      if (event === "SIGNED_IN" && session.user.id !== currentUserId) {
         // Defer auth-triggered work until Supabase finishes its auth callback.
         window.setTimeout(() => { if (active) void loadSavedQuestions(); }, 0);
       }
