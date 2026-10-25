@@ -221,6 +221,45 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     return () => { active = false; };
   }, [questions, supabase]);
 
+  // Resume the bookmark action after sign-in. The pending question ID is carried
+  // through the existing safe "next" redirect; upsert makes retries idempotent.
+  useEffect(() => {
+    const client = supabase;
+    if (!client) return;
+    const url = new URL(window.location.href);
+    const pendingQuestionId = url.searchParams.get("saveQuestion");
+    if (!pendingQuestionId) return;
+
+    let active = true;
+    async function savePendingBookmark() {
+      try {
+        const { data: userResult, error: authError } = await client.auth.getUser();
+        if (!active) return;
+        if (authError) throw authError;
+        if (!userResult.user) return;
+
+        const { error: saveError } = await client
+          .from("question_bookmarks")
+          .upsert(
+            { question_id: pendingQuestionId, user_id: userResult.user.id },
+            { onConflict: "user_id,question_id", ignoreDuplicates: true },
+          );
+        if (!active) return;
+        if (saveError) throw saveError;
+
+        setBookmarks((current) => ({ ...current, [pendingQuestionId]: true }));
+        setNotice("Question saved successfully.");
+        url.searchParams.delete("saveQuestion");
+        window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      } catch (caught) {
+        if (active) setError(getErrorMessage(caught));
+      }
+    }
+
+    void savePendingBookmark();
+    return () => { active = false; };
+  }, [supabase]);
+
   // Reset pagination in filter handlers, not on mount, so URL page=N survives initial render.
 
   async function toggleAnswer(question: Question) {
@@ -265,8 +304,10 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
       return;
     }
     if (!userResult.user) {
-      window.alert("Please sign in to save this question. You will return to the question bank after signing in.");
-      const next = window.location.pathname + window.location.search + window.location.hash;
+      window.alert("Please sign in to save this question. This question will be saved after you sign in.");
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set("saveQuestion", question.id);
+      const next = currentUrl.pathname + currentUrl.search + currentUrl.hash;
       window.location.assign("/login?next=" + encodeURIComponent(next));
       return;
     }
