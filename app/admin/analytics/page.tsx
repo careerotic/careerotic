@@ -21,17 +21,16 @@ export default async function AdminAnalyticsPage() {
   }
 
   const admin = createAdminClient();
-  const [subjectsResult, topicsResult, questionsResult, optionsResult, examsResult, examQuestionsResult, reportsResult, attemptsResult] = await Promise.all([
+  const [subjectsResult, topicsResult, questionsResult, examsResult, examQuestionsResult, reportsResult, attemptsResult] = await Promise.all([
     admin.from("subjects").select("id,name,slug").order("name"),
     admin.from("topics").select("id,name,slug,subject_id").order("name"),
     admin.from("questions").select("id,prompt,topic_id,status,language,explanation").order("created_at", { ascending: false }),
-    admin.from("question_options").select("question_id,is_correct,option_order"),
     admin.from("exams").select("id,status"),
     admin.from("exam_questions").select("exam_id,question_id"),
     admin.from("question_reports").select("id,status,reason,question_id"),
     admin.from("exam_attempts").select("submitted_at,result_snapshot").eq("status", "submitted").not("result_snapshot", "is", null).order("submitted_at", { ascending: false }).limit(500),
   ]);
-  const failures = [subjectsResult, topicsResult, questionsResult, optionsResult, examsResult, examQuestionsResult, reportsResult, attemptsResult].filter((result) => result.error);
+  const failures = [subjectsResult, topicsResult, questionsResult, examsResult, examQuestionsResult, reportsResult, attemptsResult].filter((result) => result.error);
   if (failures.length) {
     return <section className="rounded-2xl border border-red-200 bg-white p-6"><h1 className="text-xl font-bold text-slate-900">Analytics temporarily unavailable</h1><p className="mt-2 text-sm text-slate-600">The dashboard could not read one or more existing data sources. No data was changed. Check server logs and existing Supabase access policies.</p></section>;
   }
@@ -39,18 +38,33 @@ export default async function AdminAnalyticsPage() {
   const subjects = (subjectsResult.data ?? []) as AnyRow[];
   const topics = (topicsResult.data ?? []) as AnyRow[];
   const questions = (questionsResult.data ?? []) as AnyRow[];
-  const options = (optionsResult.data ?? []) as AnyRow[];
   const exams = (examsResult.data ?? []) as AnyRow[];
   const examQuestions = (examQuestionsResult.data ?? []) as AnyRow[];
   const reports = (reportsResult.data ?? []) as AnyRow[];
   const attempts = (attemptsResult.data ?? []) as AnyRow[];
   const topicById = new Map(topics.map((topic) => [topic.id, topic]));
   const subjectById = new Map(subjects.map((subject) => [subject.id, subject]));
+  // The frozen schema restricts direct reads of question_options.is_correct.
+  // Reuse the existing administrator-guarded RPC through the authenticated session.
   const optionsByQuestion = new Map<string, AnyRow[]>();
-  for (const option of options) {
-    const list = optionsByQuestion.get(option.question_id) ?? [];
-    list.push(option);
-    optionsByQuestion.set(option.question_id, list);
+  for (let offset = 0; offset < questions.length; offset += 8) {
+    const batch = questions.slice(offset, offset + 8);
+    const detailsResults = await Promise.all(batch.map(async (question) => ({
+      questionId: question.id,
+      result: await supabase.rpc("admin_get_question_details", { p_question_id: question.id }),
+    })));
+    if (detailsResults.some(({ result }) => result.error)) {
+      return <section className="rounded-2xl border border-red-200 bg-white p-6"><h1 className="text-xl font-bold text-slate-900">Analytics temporarily unavailable</h1><p className="mt-2 text-sm text-slate-600">Question-quality details could not be read through the existing administrator RPC. No data was changed. Check server logs and the active administrator session.</p></section>;
+    }
+    for (const { questionId, result } of detailsResults) {
+      const details = result.data as unknown as AnyRow | null;
+      const questionOptions = Array.isArray(details?.options) ? details.options as AnyRow[] : [];
+      optionsByQuestion.set(questionId, questionOptions.map((option) => ({
+        question_id: questionId,
+        is_correct: option.is_correct,
+        option_order: option.option_order,
+      })));
+    }
   }
   const performance = new Map<string, { answered: number; correct: number }>();
   const daily = new Map<string, { attempts: number; answered: number; correct: number }>();
