@@ -212,8 +212,23 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     let active = true;
 
     async function preloadAnswers() {
+      const cachedAnswers = questions.flatMap((question) => {
+        if (answers[question.id]) return [];
+        const cached = readClientCache<Answer>(`public:answer:${question.id}`, 2 * 60 * 1000, 10 * 60 * 1000);
+        return cached ? [[question.id, cached.data] as const] : [];
+      });
+      if (cachedAnswers.length) {
+        setAnswers((current) => {
+          const next = { ...current };
+          cachedAnswers.forEach(([id, answer]) => { if (!next[id]) next[id] = answer; });
+          return next;
+        });
+      }
+
       const missing = questions.filter(
-        (question) => !answers[question.id] && !preloadInFlight.current.has(question.id),
+        (question) => !answers[question.id]
+          && !readClientCache<Answer>(`public:answer:${question.id}`, 2 * 60 * 1000, 10 * 60 * 1000)
+          && !preloadInFlight.current.has(question.id),
       );
       for (let index = 0; index < missing.length; index += 5) {
         const batch = missing.slice(index, index + 5);
@@ -231,6 +246,7 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
         if (!active) return;
         const results = batch.map((question) => {
           const parsed = answerFromJson(payload?.answers?.[question.id]);
+          if (parsed) writeClientCache(`public:answer:${question.id}`, parsed);
           return parsed ? [question.id, parsed] as const : null;
         });
         if (results.some((result) => result !== null)) {
@@ -343,6 +359,13 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
       setOpenAnswers((current) => ({ ...current, [question.id]: true }));
       return;
     }
+    const cachedAnswer = readClientCache<Answer>(`public:answer:${question.id}`, 2 * 60 * 1000, 10 * 60 * 1000);
+    if (cachedAnswer) {
+      setAnswers((current) => ({ ...current, [question.id]: cachedAnswer.data }));
+      setAnswerErrors((current) => ({ ...current, [question.id]: "" }));
+      setOpenAnswers((current) => ({ ...current, [question.id]: true }));
+      return;
+    }
     if (answerLoading[question.id]) return;
 
     setAnswerLoading((current) => ({ ...current, [question.id]: true }));
@@ -353,6 +376,7 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
       const payload = await response.json() as { answers?: Record<string, unknown> };
       const answer = answerFromJson(payload.answers?.[question.id]);
       if (!answer?.correct_option) throw new Error("The answer is not available for this question.");
+      writeClientCache(`public:answer:${question.id}`, answer);
       setAnswers((current) => ({ ...current, [question.id]: answer }));
       setOpenAnswers((current) => ({ ...current, [question.id]: true }));
     } catch (caught) {
