@@ -67,6 +67,7 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
   const [answerErrors, setAnswerErrors] = useState<Record<string, string>>({});
   const preloadInFlight = useRef(new Set<string>());
   const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
+  const [loginPromptQuestion, setLoginPromptQuestion] = useState<Question | null>(null);
   const [loading, setLoading] = useState(initialLoadFailed);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -301,16 +302,10 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     setError("");
     setNotice("");
     const { data: userResult, error: authError } = await supabase.auth.getUser();
-    if (authError) {
-      setError("Unable to verify your sign-in status. Please try again.");
-      return;
-    }
-    if (!userResult.user) {
-      window.alert("Please sign in to save this question. This question will be saved after you sign in.");
-      const currentUrl = new URL(window.location.href);
-      currentUrl.searchParams.set("saveQuestion", question.id);
-      const next = currentUrl.pathname + currentUrl.search + currentUrl.hash;
-      window.location.assign("/login?next=" + encodeURIComponent(next));
+    if (authError || !userResult.user) {
+      // A failed session lookup should not block the user's intended sign-in flow.
+      // Let them choose whether to navigate to login or cancel the action.
+      setLoginPromptQuestion(question);
       return;
     }
     if (bookmarks[question.id]) {
@@ -425,6 +420,22 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
           </div>
         </nav>
       </div>
+
+      {loginPromptQuestion && <div className="fixed inset-50 z-[60] flex items-center justify-center bg-slate-950/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setLoginPromptQuestion(null); }}>
+        <section role="dialog" aria-modal="true" aria-labelledby="save-login-title" aria-describedby="save-login-description" className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-2xl">
+          <h2 id="save-login-title" className="text-lg font-semibold text-slate-900">Log in to save this question?</h2>
+          <p id="save-login-description" className="mt-2 text-sm leading-6 text-slate-600">You need to log in to save questions to your account. Would you like to log in now?</p>
+          <div className="mt-5 flex justify-end gap-2">
+            <button type="button" onClick={() => setLoginPromptQuestion(null)} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+            <button type="button" onClick={() => {
+              const currentUrl = new URL(window.location.href);
+              currentUrl.searchParams.set("saveQuestion", loginPromptQuestion.id);
+              const next = currentUrl.pathname + currentUrl.search + currentUrl.hash;
+              window.location.assign("/login?next=" + encodeURIComponent(next));
+            }} className="rounded-md bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">Log in</button>
+          </div>
+        </section>
+      </div>}
 
       {reportQuestion && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !reportBusy) setReportQuestion(null); }}>
         <section role="dialog" aria-modal="true" aria-labelledby="report-title" className="w-full max-w-md rounded-xl bg-white p-4 shadow-xl">
