@@ -35,19 +35,22 @@ export default function AccountPage() {
     async function loadAccount() {
       try {
         const supabase = createClient();
-        const { data, error: userError } = await supabase.auth.getUser();
-        if (userError) throw userError;
-        if (!data.user) {
+        // Guests are expected here: getSession returns a null session without
+        // treating the absence of authentication as an application error.
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        const user = sessionData.session?.user;
+        if (!user) {
           if (active) setSignedIn(false);
           return;
         }
         if (!active) return;
         setSignedIn(true);
         setProfile({
-          fullName: typeof data.user.user_metadata?.full_name === "string" ? data.user.user_metadata.full_name : "",
-          email: data.user.email ?? "",
-          phoneNumber: typeof data.user.user_metadata?.phone_number === "string" ? data.user.user_metadata.phone_number : "",
-          dateOfBirth: typeof data.user.user_metadata?.date_of_birth === "string" ? data.user.user_metadata.date_of_birth : "",
+          fullName: typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : "",
+          email: user.email ?? "",
+          phoneNumber: typeof user.user_metadata?.phone_number === "string" ? user.user_metadata.phone_number : "",
+          dateOfBirth: typeof user.user_metadata?.date_of_birth === "string" ? user.user_metadata.date_of_birth : "",
         });
       } catch (caught) {
         if (active) setError(caught instanceof Error ? caught.message : "Unable to load your account.");
