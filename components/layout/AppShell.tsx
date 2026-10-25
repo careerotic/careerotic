@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { clearPrivateClientCache } from "@/lib/cache/client-memory";
+import { clearPrivateClientCache, setPrivateCacheUserId } from "@/lib/cache/client-memory";
 import { usePathname, useRouter } from "next/navigation";
 import Breadcrumbs from "./Breadcrumbs";
 import GlobalFooter from "./GlobalFooter";
@@ -25,6 +25,7 @@ export default function AppShell({ children, initialUser }: Props) {
   useEffect(() => {
     let active = true;
     let currentUserId: string | null = null;
+    let authEventSeen = false;
     let supabase: ReturnType<typeof createClient>;
     try {
       supabase = createClient();
@@ -33,19 +34,25 @@ export default function AppShell({ children, initialUser }: Props) {
     }
 
     void supabase.auth.getSession().then(({ data }) => {
-      if (active) currentUserId = data.session?.user.id ?? null;
+      // An auth event is authoritative if it raced with the initial session lookup.
+      if (!active || authEventSeen) return;
+      currentUserId = data.session?.user.id ?? null;
+      setPrivateCacheUserId(currentUserId);
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      authEventSeen = true;
       if (event === "SIGNED_OUT" || !session?.user) {
         clearPrivateClientCache();
+        setPrivateCacheUserId(null);
         currentUserId = null;
         return;
       }
-      if (event === "SIGNED_IN" && currentUserId && currentUserId !== session.user.id) {
+      if (currentUserId && currentUserId !== session.user.id) {
         clearPrivateClientCache();
       }
       currentUserId = session.user.id;
+      setPrivateCacheUserId(currentUserId);
     });
 
     return () => {
