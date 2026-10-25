@@ -67,6 +67,7 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
   const [answerErrors, setAnswerErrors] = useState<Record<string, string>>({});
   const preloadInFlight = useRef(new Set<string>());
   const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
+  const [loginPromptQuestion, setLoginPromptQuestion] = useState<Question | null>(null);
   const [loading, setLoading] = useState(initialLoadFailed);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -221,6 +222,45 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     return () => { active = false; };
   }, [questions, supabase]);
 
+  // Complete a guest's pending save after sign-in. The question ID is carried
+  // through the existing safe "next" redirect; upsert keeps retries idempotent.
+  useEffect(() => {
+    const client = supabase;
+    if (!client) return;
+    const pendingUrl = new URL(window.location.href);
+    const pendingQuestionId = pendingUrl.searchParams.get("saveQuestion");
+    if (!pendingQuestionId) return;
+
+    let active = true;
+    async function savePendingBookmark() {
+      try {
+        const { data: userResult, error: authError } = await client.auth.getUser();
+        if (!active) return;
+        if (authError) throw authError;
+        if (!userResult.user) return;
+
+        const { error: saveError } = await client
+          .from("question_bookmarks")
+          .upsert(
+            { question_id: pendingQuestionId, user_id: userResult.user.id },
+            { onConflict: "user_id,question_id", ignoreDuplicates: true },
+          );
+        if (!active) return;
+        if (saveError) throw saveError;
+
+        setBookmarks((current) => ({ ...current, [pendingQuestionId]: true }));
+        setNotice("Question saved successfully.");
+        pendingUrl.searchParams.delete("saveQuestion");
+        window.history.replaceState({}, "", pendingUrl.pathname + pendingUrl.search + pendingUrl.hash);
+      } catch (caught) {
+        if (active) setError(getErrorMessage(caught));
+      }
+    }
+
+    void savePendingBookmark();
+    return () => { active = false; };
+  }, [supabase]);
+
   // Reset pagination in filter handlers, not on mount, so URL page=N survives initial render.
 
   async function toggleAnswer(question: Question) {
@@ -260,14 +300,9 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     setError("");
     setNotice("");
     const { data: userResult, error: authError } = await supabase.auth.getUser();
-    if (authError) {
-      setError("Unable to verify your sign-in status. Please try again.");
-      return;
-    }
-    if (!userResult.user) {
-      window.alert("Please sign in to save this question. You will return to the question bank after signing in.");
-      const next = window.location.pathname + window.location.search + window.location.hash;
-      window.location.assign("/login?next=" + encodeURIComponent(next));
+    if (authError || !userResult.user) {
+      // Keep guests on the current page until they explicitly choose to sign in.
+      setLoginPromptQuestion(question);
       return;
     }
     if (bookmarks[question.id]) {
@@ -382,6 +417,22 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
           </div>
         </nav>
       </div>
+
+      {loginPromptQuestion && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setLoginPromptQuestion(null); }}>
+        <section role="dialog" aria-modal="true" aria-labelledby="save-login-title" aria-describedby="save-login-description" className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-2xl">
+          <h2 id="save-login-title" className="text-lg font-semibold text-slate-900">Log in to save this question?</h2>
+          <p id="save-login-description" className="mt-2 text-sm leading-6 text-slate-600">You need an account to save questions. You can keep browsing, or log in now and we’ll save this question for you.</p>
+          <div className="mt-5 flex justify-end gap-2">
+            <button type="button" onClick={() => setLoginPromptQuestion(null)} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">Cancel</button>
+            <button type="button" onClick={() => {
+              const currentUrl = new URL(window.location.href);
+              currentUrl.searchParams.set("saveQuestion", loginPromptQuestion.id);
+              const next = currentUrl.pathname + currentUrl.search + currentUrl.hash;
+              window.location.assign("/login?next=" + encodeURIComponent(next));
+            }} className="rounded-md bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">Login</button>
+          </div>
+        </section>
+      </div>}
 
       {reportQuestion && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !reportBusy) setReportQuestion(null); }}>
         <section role="dialog" aria-modal="true" aria-labelledby="report-title" className="w-full max-w-md rounded-xl bg-white p-4 shadow-xl">
