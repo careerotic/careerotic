@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import TopicQuestionList from "@/components/questions/TopicQuestionList";
+import QuestionBankPagination from "@/components/questions/QuestionBankPagination";
 import { getCachedSubjectPageData, getCachedTopicPageData } from "@/lib/cache/public-data";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 25;
 type RouteProps = {
   params: Promise<{ subjectSlug: string; topicSlug: string }>;
   searchParams: Promise<{ page?: string }>;
@@ -32,8 +33,10 @@ export async function generateMetadata({ params }: RouteProps): Promise<Metadata
 
 export default async function TopicPage({ params, searchParams }: RouteProps) {
   const [{ subjectSlug, topicSlug }, query] = await Promise.all([params, searchParams]);
-  const requestedPage = Number.parseInt(query.page ?? "1", 10);
-  const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const rawPage = query.page ?? "1";
+  if (!/^[1-9]\d*$/.test(rawPage)) notFound();
+  const page = Number(rawPage);
+  if (!Number.isSafeInteger(page)) notFound();
   let subject: { id: string; name: string; slug: string } | null = null;
   let topic: { id: string; name: string; slug: string; subject_id: string } | null = null;
   let questions: QuestionRow[] = [];
@@ -52,6 +55,7 @@ export default async function TopicPage({ params, searchParams }: RouteProps) {
   if (!topic) notFound();
   const from = (page - 1) * PAGE_SIZE;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (page > totalPages) notFound();
   const first = total ? from + 1 : 0;
   const last = Math.min(from + questions.length, total);
 
@@ -80,20 +84,16 @@ export default async function TopicPage({ params, searchParams }: RouteProps) {
           <Link href={`/subjects/${subject.slug}`} className="mt-3 inline-flex text-sm font-semibold text-indigo-700 hover:underline">Back to {subject.name}</Link>
         </section>
       ) : (
-        <TopicQuestionList questions={questions} />
+        <TopicQuestionList questions={questions} subject={subject.name} topic={topic.name} />
       )}
 
-      {totalPages > 1 && (
-        <nav aria-label="Question pages" className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
-          {page > 1 ? (
-            <Link href={`/subjects/${subject.slug}/${topic.slug}?page=${page - 1}`} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50">← Previous</Link>
-          ) : <span />}
-          <span className="text-xs text-slate-500">Page {page} of {totalPages}</span>
-          {page < totalPages ? (
-            <Link href={`/subjects/${subject.slug}/${topic.slug}?page=${page + 1}`} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50">Next →</Link>
-          ) : <span />}
-        </nav>
-      )}
+      <QuestionBankPagination
+        baseHref={`/subjects/${subject.slug}/${topic.slug}`}
+        page={page}
+        totalPages={totalPages}
+        pageSize={PAGE_SIZE}
+        ariaLabel="Topic question pagination"
+      />
     </main>
   );
 }
