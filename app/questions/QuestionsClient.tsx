@@ -227,6 +227,15 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
   }, [supabase, page, subjectId, topicId, language, search, sort]);
 
   useEffect(() => {
+    function handleRouteRevalidate(event: Event) {
+      const detail = (event as CustomEvent<{ pathname?: string }>).detail;
+      if (detail?.pathname === "/questions") void loadQuestions();
+    }
+    window.addEventListener("careerotic:route-revalidate", handleRouteRevalidate);
+    return () => window.removeEventListener("careerotic:route-revalidate", handleRouteRevalidate);
+  }, [loadQuestions]);
+
+  useEffect(() => {
     if (!supabase) return;
     if (skipInitialQuestionFetch.current) {
       skipInitialQuestionFetch.current = false;
