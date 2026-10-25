@@ -87,17 +87,13 @@ export default async function TopicPage({ params, searchParams }: RouteProps) {
         <TopicQuestionList questions={questions} subject={subject.name} topic={topic.name} />
       )}
 
-      {totalPages > 1 && (
-        <div className="rounded-xl border border-slate-200 bg-white p-3">
-          <QuestionBankPagination
-            baseHref={`/subjects/${subject.slug}/${topic.slug}`}
-            page={page}
-            totalPages={totalPages}
-            pageSize={PAGE_SIZE}
-            ariaLabel="Topic question pagination"
-          />
-        </div>
-      )}
+      <QuestionBankPagination
+        baseHref={`/subjects/${subject.slug}/${topic.slug}`}
+        page={page}
+        totalPages={totalPages}
+        pageSize={PAGE_SIZE}
+        ariaLabel="Topic question pagination"
+      />
     </main>
   );
 }
