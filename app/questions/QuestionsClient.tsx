@@ -86,11 +86,45 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   useEffect(() => {
-    writeClientCache<QuestionPageData>(
-      questionCacheKey(initialPage, "all", "all", "all", "", "newest"),
-      { questions: initialQuestions, total: initialTotal },
-    );
-  }, [initialQuestions, initialPage, initialTotal]);
+    if (initialLoadFailed) return;
+
+    const key = questionCacheKey(initialPage, "all", "all", "all", "", "newest");
+    const cached = readClientCache<QuestionPageData>(key, 60 * 1000, 10 * 60 * 1000);
+    const showingInitialQuery =
+      page === initialPage &&
+      subjectId === "all" &&
+      topicId === "all" &&
+      language === "all" &&
+      search === "" &&
+      sort === "newest";
+
+    // Never replace a fresher client entry with an older server-rendered cache entry.
+    if (cached?.isFresh) {
+      if (showingInitialQuery) {
+        setQuestions(cached.data.questions);
+        setTotal(cached.data.total);
+      }
+      return;
+    }
+
+    // Server-rendered data is available without a client fetch; use it to refresh stale entries.
+    writeClientCache<QuestionPageData>(key, { questions: initialQuestions, total: initialTotal });
+    if (showingInitialQuery) {
+      setQuestions(initialQuestions);
+      setTotal(initialTotal);
+    }
+  }, [
+    initialQuestions,
+    initialPage,
+    initialTotal,
+    initialLoadFailed,
+    page,
+    subjectId,
+    topicId,
+    language,
+    search,
+    sort,
+  ]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
