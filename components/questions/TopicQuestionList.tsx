@@ -84,7 +84,7 @@ export default function TopicQuestionList({
   useEffect(() => {
     if (!supabase) return;
     const url = new URL(window.location.href);
-    const questionId = url.searchParams.get("saveQuestion");
+    const questionId = url.searchParams.get("saveQuestion") ?? "";
     if (!questionId || !questions.some((question) => question.id === questionId)) return;
     let active = true;
     let busy = false;
