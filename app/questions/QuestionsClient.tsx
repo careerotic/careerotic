@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import QuestionBankCard from "@/components/questions/QuestionBankCard";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { readClientCache, writeClientCache } from "@/lib/cache/client-memory";
+import { clearClientCache, readClientCache, writeClientCache } from "@/lib/cache/client-memory";
 
 type Option = { id: string; question_id: string; option_text: string; option_order: number };
 type Question = {
@@ -315,6 +315,7 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
         if (saveError) throw saveError;
 
         saved = true;
+        clearClientCache(`private:${userId}:saved-questions`);
         setBookmarks((current) => ({ ...current, [questionId]: true }));
         setNotice("Question saved successfully.");
         setError("");
@@ -403,10 +404,12 @@ export default function QuestionsClient({ initialQuestions, initialLoadFailed = 
     if (bookmarks[question.id]) {
       const { error: deleteError } = await supabase.from("question_bookmarks").delete().eq("question_id", question.id).eq("user_id", userResult.user.id);
       if (deleteError) { setError(deleteError.message); return; }
+      clearClientCache(`private:${userResult.user.id}:saved-questions`);
       setBookmarks((current) => ({ ...current, [question.id]: false }));
     } else {
       const { error: insertError } = await supabase.from("question_bookmarks").insert({ question_id: question.id, user_id: userResult.user.id });
       if (insertError) { setError(insertError.message); return; }
+      clearClientCache(`private:${userResult.user.id}:saved-questions`);
       setBookmarks((current) => ({ ...current, [question.id]: true }));
     }
   }
