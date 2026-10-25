@@ -6,7 +6,7 @@ export async function proxy(request: NextRequest) {
   const response = NextResponse.next({ request });
   const path = request.nextUrl.pathname;
   const admin = path === "/admin" || path.startsWith("/admin/");
-  const protectedPath = ["/dashboard", "/account", "/saved-questions"].some(
+  const protectedPath = ["/dashboard"].some(
     (p) => path === p || path.startsWith(p + "/"),
   );
   const authRedirectPath = ["/login", "/signup", "/forgot-password"].includes(path);

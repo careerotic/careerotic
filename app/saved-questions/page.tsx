@@ -1,8 +1,242 @@
 "use client";
+
 import Link from "next/link";
-import {useEffect,useState} from "react";
-import {createClient} from "@/lib/supabase/client";
-import {Skeleton} from "@/components/ui/Skeleton";
-type Saved={question_id:string;questions:{id:string;prompt:string;language:string;question_options:{id:string;option_text:string;option_order:number}[]|null;topics:{name:string;subjects:{name:string}|null}|null}|null};
-export default function SavedQuestionsPage(){const [rows,setRows]=useState<Saved[]>([]);const [loading,setLoading]=useState(true);const [signedIn,setSignedIn]=useState<boolean|null>(null);const [error,setError]=useState("");const [busy,setBusy]=useState("");useEffect(()=>{let active=true;void(async()=>{try{const db=createClient();const {data:auth,error:ae}=await db.auth.getUser();if(ae)throw ae;if(!auth.user){if(active){setSignedIn(false);setLoading(false)}return}const {data,error}=await db.from("question_bookmarks").select("question_id,questions(id,prompt,language,question_options(id,option_text,option_order),topics(name,subjects(name)))").eq("user_id",auth.user.id).order("created_at",{ascending:false});if(error)throw error;if(active){setSignedIn(true);setRows((data??[]) as unknown as Saved[])}}catch(e){if(active)setError(e instanceof Error?e.message:"Saved questions could not be loaded")}finally{if(active)setLoading(false)}})();return()=>{active=false}},[]);async function remove(id:string){setBusy(id);setError("");try{const db=createClient();const {data:auth}=await db.auth.getUser();if(!auth.user){setSignedIn(false);return}const {error}=await db.from("question_bookmarks").delete().eq("user_id",auth.user.id).eq("question_id",id);if(error)throw error;setRows(old=>old.filter(r=>r.question_id!==id))}catch(e){setError(e instanceof Error?e.message:"Could not remove bookmark")}finally{setBusy("")}}return <main className="space-y-4"><header className="rounded-xl border bg-white p-4"><p className="text-xs font-bold uppercase text-indigo-700">Personal study</p><h1 className="mt-1 text-2xl font-bold">Saved Questions</h1><p className="mt-1 text-sm text-slate-600">Your bookmarks from the existing question_bookmarks table.</p></header>{loading?<div role="status" aria-label="Loading saved questions" aria-busy="true" className="space-y-2">{[1,2,3].map(i=><section key={i} className="rounded-xl border bg-white p-3"><Skeleton className="h-3 w-32 rounded bg-slate-200"/><Skeleton className="mt-3 h-4 w-5/6 rounded bg-slate-200"/><Skeleton className="mt-2 h-4 w-2/3 rounded bg-slate-100"/><div className="mt-3 grid gap-2 sm:grid-cols-2"><Skeleton className="h-9 rounded-md bg-slate-100"/><Skeleton className="h-9 rounded-md bg-slate-100"/></div></section>)}</div>:signedIn===false?<Empty title="Sign in to view saved questions" body="Bookmarks are linked to your account." action="/login?next=%2Fsaved-questions" label="Sign in"/>:error?<p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>:rows.length?<div className="space-y-2">{rows.map(r=>{const q=r.questions;return <article key={r.question_id} className="rounded-xl border bg-white p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs text-slate-500">{q?.topics?.subjects?.name??"Question bank"}{q?.topics?.name?" · "+q.topics.name:""}{q?.language?" · "+q.language:""}</p><h2 className="mt-1 whitespace-pre-wrap break-words text-sm font-semibold leading-6">{q?.prompt??"Question unavailable"}</h2></div><button type="button" disabled={busy===r.question_id} onClick={()=>void remove(r.question_id)} className="shrink-0 rounded-md border px-2.5 py-1.5 text-xs font-semibold disabled:opacity-50">{busy===r.question_id?"Removing…":"Remove"}</button></div>{q?.question_options?.length?<ol className="mt-3 grid gap-1.5 sm:grid-cols-2">{[...q.question_options].sort((a,b)=>a.option_order-b.option_order).map((o,i)=><li key={o.id} className="rounded-md bg-slate-50 px-3 py-2 text-sm"><span className="mr-2 text-xs font-semibold text-slate-500">{String.fromCharCode(65+i)}.</span>{o.option_text}</li>)}</ol>:null}<Link href="/questions" className="mt-3 inline-flex text-xs font-semibold text-indigo-700">Open question bank →</Link></article>})}</div>:<Empty title="No saved questions yet" body="Use the bookmark icon in the question bank to save items for revision." action="/questions" label="Browse questions"/>}</main>}
-function Empty({title,body,action,label}:{title:string;body:string;action:string;label:string}){return <section className="rounded-xl border border-dashed bg-white p-8 text-center"><h2 className="font-semibold">{title}</h2><p className="mt-1 text-sm text-slate-600">{body}</p><Link href={action} className="mt-4 inline-flex rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white">{label}</Link></section>}
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { GuestAccessPrompt } from "@/components/auth/GuestAccessPrompt";
+import { clearPrivateClientCache, getPrivateCacheUserId, readClientCache, setPrivateCacheUserId, writeClientCache } from "@/lib/cache/client-memory";
+
+type Saved = {
+  question_id: string;
+  questions: {
+    id: string;
+    prompt: string;
+    language: string;
+    question_options: { id: string; option_text: string; option_order: number }[] | null;
+    topics: { name: string; subjects: { name: string } | null } | null;
+  } | null;
+};
+
+export default function SavedQuestionsPage() {
+  // Reuse this tab's private cache immediately on return navigation. The session is
+  // still verified below before any network request or mutation is allowed.
+  const cachedUserId = getPrivateCacheUserId();
+  const initialCachedRows = cachedUserId
+    ? readClientCache<Saved[]>(`private:${cachedUserId}:saved-questions`, 30 * 1000, 5 * 60 * 1000)
+    : null;
+  const [rows, setRows] = useState<Saved[]>(() => initialCachedRows?.data ?? []);
+  const [loading, setLoading] = useState(() => !initialCachedRows);
+  const [signedIn, setSignedIn] = useState<boolean | null>(() => initialCachedRows ? true : null);
+  const [userId, setUserId] = useState<string | null>(() => initialCachedRows ? cachedUserId : null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    let requestSequence = 0;
+    let currentUserId: string | null = null;
+    const db = createClient();
+
+    async function loadSavedQuestions() {
+      const requestId = ++requestSequence;
+      try {
+        // A missing session is expected for guests, not an application error.
+        const { data: sessionData, error: sessionError } = await db.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (!active || requestId !== requestSequence) return;
+
+        const user = sessionData.session?.user;
+        if (!user) {
+          currentUserId = null;
+          setPrivateCacheUserId(null);
+          setUserId(null);
+          setSignedIn(false);
+          setRows([]);
+          return;
+        }
+
+        if (currentUserId && currentUserId !== user.id) clearPrivateClientCache();
+        currentUserId = user.id;
+        setPrivateCacheUserId(user.id);
+        setUserId(user.id);
+        setSignedIn(true);
+
+        const cacheKey = `private:${user.id}:saved-questions`;
+        const cached = readClientCache<Saved[]>(cacheKey, 30 * 1000, 5 * 60 * 1000);
+        if (cached) {
+          setRows(cached.data);
+          setLoading(false);
+          if (cached.isFresh) return;
+        }
+
+        const { data, error: queryError } = await db
+          .from("question_bookmarks")
+          .select("question_id,questions(id,prompt,language,question_options(id,option_text,option_order),topics(name,subjects(name)))")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (queryError) throw queryError;
+        if (!active || requestId !== requestSequence || currentUserId !== user.id) return;
+        const freshRows = (data ?? []) as unknown as Saved[];
+        writeClientCache(cacheKey, freshRows);
+        setRows(freshRows);
+        setError("");
+      } catch (caught) {
+        if (!active || requestId !== requestSequence) return;
+        setError(caught instanceof Error ? caught.message : "Saved questions could not be loaded.");
+      } finally {
+        if (active && requestId === requestSequence) setLoading(false);
+      }
+    }
+
+    function handleRouteRevalidate(event: Event) {
+      const detail = (event as CustomEvent<{ pathname?: string }>).detail;
+      if (detail?.pathname === "/saved-questions") void loadSavedQuestions();
+    }
+    window.addEventListener("careerotic:route-revalidate", handleRouteRevalidate);
+
+    const { data: authListener } = db.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session?.user) {
+        requestSequence += 1;
+        currentUserId = null;
+        clearPrivateClientCache();
+        setPrivateCacheUserId(null);
+        setUserId(null);
+        setSignedIn(false);
+        setRows([]);
+        setLoading(false);
+        return;
+      }
+      if (event === "SIGNED_IN" && session.user.id !== currentUserId) {
+        // Defer auth-triggered work until Supabase finishes its auth callback.
+        window.setTimeout(() => { if (active) void loadSavedQuestions(); }, 0);
+      }
+    });
+
+    void loadSavedQuestions();
+    return () => {
+      active = false;
+      window.removeEventListener("careerotic:route-revalidate", handleRouteRevalidate);
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  async function remove(questionId: string) {
+    setBusy(questionId);
+    setError("");
+
+    try {
+      const db = createClient();
+      const { data: sessionData, error: sessionError } = await db.auth.getSession();
+      if (sessionError) throw sessionError;
+
+      const user = sessionData.session?.user;
+      if (!user) {
+        setSignedIn(false);
+        return;
+      }
+
+      const { error: deleteError } = await db
+        .from("question_bookmarks")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("question_id", questionId);
+
+      if (deleteError) throw deleteError;
+      const nextRows = rows.filter(row => row.question_id !== questionId);
+      setRows(nextRows);
+      if (userId) writeClientCache(`private:${userId}:saved-questions`, nextRows);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not remove the saved question.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  return (
+    <main className="space-y-4">
+      <header className="rounded-xl border bg-white p-4">
+        <p className="text-xs font-bold uppercase text-indigo-700">Personal study</p>
+        <h1 className="mt-1 text-2xl font-bold">Saved Questions</h1>
+        <p className="mt-1 text-sm text-slate-600">Keep important questions together for later revision.</p>
+      </header>
+
+      {loading ? (
+        <div role="status" aria-label="Loading saved questions" aria-busy="true" className="space-y-2">
+          {[1, 2, 3].map(index => (
+            <section key={index} className="rounded-xl border bg-white p-3">
+              <Skeleton className="h-3 w-32 rounded bg-slate-200" />
+              <Skeleton className="mt-3 h-4 w-5/6 rounded bg-slate-200" />
+              <Skeleton className="mt-2 h-4 w-2/3 rounded bg-slate-100" />
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <Skeleton className="h-9 rounded-md bg-slate-100" />
+                <Skeleton className="h-9 rounded-md bg-slate-100" />
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : signedIn === false ? (
+        <GuestAccessPrompt
+          eyebrow="Personal study"
+          title="Log in to view saved questions"
+          description="Your saved questions are connected to your account. Log in to revisit them anytime, or create a free account to start building your personal question collection."
+          returnTo="/saved-questions"
+        />
+      ) : error ? (
+        <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>
+      ) : rows.length ? (
+        <div className="space-y-2">
+          {rows.map(row => {
+            const question = row.questions;
+            return (
+              <article key={row.question_id} className="rounded-xl border bg-white p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-500">
+                      {question?.topics?.subjects?.name ?? "Question bank"}
+                      {question?.topics?.name ? ` · ${question.topics.name}` : ""}
+                      {question?.language ? ` · ${question.language}` : ""}
+                    </p>
+                    <h2 className="mt-1 whitespace-pre-wrap break-words text-sm font-semibold leading-6">
+                      {question?.prompt ?? "Question unavailable"}
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={busy === row.question_id}
+                    onClick={() => void remove(row.question_id)}
+                    className="shrink-0 rounded-md border px-2.5 py-1.5 text-xs font-semibold disabled:opacity-50"
+                  >
+                    {busy === row.question_id ? "Removing…" : "Remove"}
+                  </button>
+                </div>
+                {question?.question_options?.length ? (
+                  <ol className="mt-3 grid gap-1.5 sm:grid-cols-2">
+                    {[...question.question_options].sort((a, b) => a.option_order - b.option_order).map((option, index) => (
+                      <li key={option.id} className="rounded-md bg-slate-50 px-3 py-2 text-sm">
+                        <span className="mr-2 text-xs font-semibold text-slate-500">{String.fromCharCode(65 + index)}.</span>
+                        {option.option_text}
+                      </li>
+                    ))}
+                  </ol>
+                ) : null}
+                <Link href="/questions" className="mt-3 inline-flex text-xs font-semibold text-indigo-700">
+                  Open question bank →
+                </Link>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <section className="rounded-xl border border-dashed bg-white p-8 text-center">
+          <h2 className="font-semibold">No saved questions yet</h2>
+          <p className="mt-1 text-sm text-slate-600">Use the bookmark icon in the question bank to save items for revision.</p>
+          <Link href="/questions" className="mt-4 inline-flex rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white">
+            Browse questions
+          </Link>
+        </section>
+      )}
+    </main>
+  );
+}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { GuestAccessPrompt } from "@/components/auth/GuestAccessPrompt";
 
 type AccountForm = {
   fullName: string;
@@ -23,6 +24,7 @@ function todayLocalDate() {
 export default function AccountPage() {
   const [profile, setProfile] = useState<AccountForm>({ fullName: "", email: "", phoneNumber: "", dateOfBirth: "" });
   const [loading, setLoading] = useState(true);
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -33,15 +35,22 @@ export default function AccountPage() {
     async function loadAccount() {
       try {
         const supabase = createClient();
-        const { data, error: userError } = await supabase.auth.getUser();
-        if (userError) throw userError;
-        if (!data.user) throw new Error("Your session has expired. Please sign in again.");
+        // Guests are expected here: getSession returns a null session without
+        // treating the absence of authentication as an application error.
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        const user = sessionData.session?.user;
+        if (!user) {
+          if (active) setSignedIn(false);
+          return;
+        }
         if (!active) return;
+        setSignedIn(true);
         setProfile({
-          fullName: typeof data.user.user_metadata?.full_name === "string" ? data.user.user_metadata.full_name : "",
-          email: data.user.email ?? "",
-          phoneNumber: typeof data.user.user_metadata?.phone_number === "string" ? data.user.user_metadata.phone_number : "",
-          dateOfBirth: typeof data.user.user_metadata?.date_of_birth === "string" ? data.user.user_metadata.date_of_birth : "",
+          fullName: typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : "",
+          email: user.email ?? "",
+          phoneNumber: typeof user.user_metadata?.phone_number === "string" ? user.user_metadata.phone_number : "",
+          dateOfBirth: typeof user.user_metadata?.date_of_birth === "string" ? user.user_metadata.date_of_birth : "",
         });
       } catch (caught) {
         if (active) setError(caught instanceof Error ? caught.message : "Unable to load your account.");
@@ -95,6 +104,27 @@ export default function AccountPage() {
 
   const field = "w-full rounded-lg border border-slate-300 px-3.5 py-3 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 disabled:bg-slate-100 disabled:text-slate-600";
   const label = "mb-1.5 block text-sm font-medium text-slate-700";
+
+  if (!loading && signedIn === false) {
+    return (
+      <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-900">
+        <div className="mx-auto max-w-2xl">
+          <header className="flex items-center justify-between">
+            <Link href="/" className="text-lg font-bold text-indigo-700">Careerotic</Link>
+            <Link href="/questions" className="text-sm font-semibold text-indigo-700 hover:underline">Browse questions →</Link>
+          </header>
+          <div className="mt-7">
+            <GuestAccessPrompt
+              eyebrow="Your account"
+              title="Log in to access your account"
+              description="Please log in to view and manage your account details. If you don’t have a Careerotic account yet, you can create one for free."
+              returnTo="/account"
+            />
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-900">
