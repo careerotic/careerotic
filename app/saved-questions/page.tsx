@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { GuestAccessPrompt } from "@/components/auth/GuestAccessPrompt";
-import { clearPrivateClientCache, readClientCache, writeClientCache } from "@/lib/cache/client-memory";
+import { clearPrivateClientCache, getPrivateCacheUserId, readClientCache, setPrivateCacheUserId, writeClientCache } from "@/lib/cache/client-memory";
 
 type Saved = {
   question_id: string;
@@ -19,10 +19,16 @@ type Saved = {
 };
 
 export default function SavedQuestionsPage() {
-  const [rows, setRows] = useState<Saved[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [signedIn, setSignedIn] = useState<boolean | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
+  // Reuse this tab's private cache immediately on return navigation. The session is
+  // still verified below before any network request or mutation is allowed.
+  const cachedUserId = getPrivateCacheUserId();
+  const initialCachedRows = cachedUserId
+    ? readClientCache<Saved[]>(`private:${cachedUserId}:saved-questions`, 30 * 1000, 5 * 60 * 1000)
+    : null;
+  const [rows, setRows] = useState<Saved[]>(() => initialCachedRows?.data ?? []);
+  const [loading, setLoading] = useState(() => !initialCachedRows);
+  const [signedIn, setSignedIn] = useState<boolean | null>(() => initialCachedRows ? true : null);
+  const [userId, setUserId] = useState<string | null>(() => initialCachedRows ? cachedUserId : null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
 
@@ -43,6 +49,7 @@ export default function SavedQuestionsPage() {
         const user = sessionData.session?.user;
         if (!user) {
           currentUserId = null;
+          setPrivateCacheUserId(null);
           setUserId(null);
           setSignedIn(false);
           setRows([]);
@@ -51,6 +58,7 @@ export default function SavedQuestionsPage() {
 
         if (currentUserId && currentUserId !== user.id) clearPrivateClientCache();
         currentUserId = user.id;
+        setPrivateCacheUserId(user.id);
         setUserId(user.id);
         setSignedIn(true);
 
@@ -87,6 +95,7 @@ export default function SavedQuestionsPage() {
         requestSequence += 1;
         currentUserId = null;
         clearPrivateClientCache();
+        setPrivateCacheUserId(null);
         setUserId(null);
         setSignedIn(false);
         setRows([]);
