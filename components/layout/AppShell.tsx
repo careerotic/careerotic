@@ -89,6 +89,7 @@ export default function AppShell({ children, initialUser }: Props) {
     // The Router Cache renders the previous route immediately; refresh the RSC payload
     // in the background when the page has not been visited recently.
     if (lastVisitedAt !== undefined && now - lastVisitedAt > ROUTE_REFRESH_AFTER_MS) {
+      window.dispatchEvent(new CustomEvent("careerotic:route-revalidate", { detail: { pathname } }));
       router.refresh();
     }
   }, [pathname, router]);
